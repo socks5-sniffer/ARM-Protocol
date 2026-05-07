@@ -314,32 +314,22 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 
 ```
 /
-├── ARM_run16_v06.jsx          # Current protocol — v0.6, Run 16
-├── versions/                  # Archived protocol versions (v0.1–v0.5x)
-│   ├── ARM_v01.jsx
-│   ├── ARM_v011.jsx
-│   ├── ARM_v02.jsx
-│   ├── ARM_v04.jsx
-│   ├── ARM_v05.jsx
-│   ├── ARM_v0512_values.jsx
-│   ├── ARM_v0514_neutral_control.jsx
-│   ├── ARM_v052.jsx
-│   ├── ARM_v052_features.jsx
-│   ├── ARM_v05_sequential.jsx
-│   ├── ARM_v05_sequential(1).jsx
-│   └── ARM_v0616.jsx
+├── .env.example               # Environment variable template
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── SECURITY.md
+├── index.html                 # Vite entry point
+├── package.json
+├── vite.config.js
 ├── src/                       # React app source
-├── public/                    # Static assets
-├── dist/                      # Build output
-├── data/                      # Research documents, run logs, findings
-│   ├── ARM_WhitePaper_v01.docx
-│   ├── ARM_v05_Findings_Summary.md
-│   ├── ARM_v05_CrossModel_Briefing.md
-│   ├── Run 10 review — the most informative run yet.md
-│   ├── SESSION_NOTES.md
-│   └── ...
-└── delta_drift.py             # Drift computation utilities
+│   ├── App.jsx                # Current protocol — v0.6, Run 16
+│   └── main.jsx
+└── trace/                     # Exported run telemetry (JSON)
+    └── arm-v06-*.json
 ```
+
+> **Note:** `versions/` (archived protocol files), `data/` (research documents), and `delta_drift.py` (drift utilities) exist locally and are intentionally excluded from the public repository via `.gitignore`.
 
 ---
 
