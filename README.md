@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
 
-> **Current version:** `v0.6` · `ARM_run16_v06.jsx` · Model: `claude-sonnet-4-20250514`
+> **Current version:** `v0.6` · `src/App.jsx` · Model: `claude-sonnet-4-6`
 
 ---
 
@@ -58,7 +58,7 @@ Gamma R2 produces the master output:
 
 ## 🔬 v0.6 Upgrades (Run 16)
 
-`ARM_run16_v06.jsx` introduces five protocol upgrades informed by cross-model review (Gemini + GPT recommendations):
+`src/App.jsx` introduces five protocol upgrades informed by cross-model review (Gemini + GPT recommendations):
 
 ### 1. Asymmetric Drift Thresholds
 Previous versions used a symmetric ±0.05 memetic drift flag. v0.6 splits this:
@@ -101,7 +101,7 @@ A UI checkbox enables/disables ethical frame injection for Alpha and Beta. When 
 
 ## 📊 Key Empirical Findings
 
-Findings from 16+ runs across v0.3–v0.6 (documented in `/data`):
+Findings from 30+ runs across v0.3–v0.6 (documented in `/trace`):
 
 ### Epistemic Tightening is the Dominant Pattern
 
@@ -110,7 +110,7 @@ Across all clean runs (agents successfully parsed, no rate-limit failures):
 | Pattern | Frequency | Interpretation |
 |---|---|---|
 | Epistemic tightening (Δ ≤ 0) | ~85% of agent-rounds | Peer exposure made agents more careful |
-| Memetic drift (Δ > +0.05) | ~10% of agent-rounds | Flagged — peer pressure drove up confidence |
+| Memetic drift (Δ > +0.04) | ~10% of agent-rounds | Flagged — peer pressure drove up confidence |
 | No change | ~5% | Stable independent position |
 
 Deliberation consistently produces more calibrated (lower confidence) outputs, not more confident ones. This is the intended behavior.
@@ -146,7 +146,7 @@ Solo reasoning systematically overestimates certainty. Deliberation corrects it.
 | Clear moral direction (whistleblower, cancer researcher) | `none` | Converged because the answer is clear, not because of bias |
 | AI lying (genuine philosophical split) | `reasoning` | Deontological absolute vs. consequentialist exception |
 | Open-source AI (empirically underdetermined) | `information` | Agents shared values but lacked empirical data |
-| No run to date | `values` | Requires adversarial design or cross-model pools |
+| Adversarial role injection (Runs 12–13, AI deception question) | `values` | Triggered by hard-coded adversarial frames; cross-model pools expected to surface this more frequently |
 
 The classifier correctly distinguishes *consensus because the answer is clear* from *consensus because agents share training priors*.
 
@@ -228,19 +228,28 @@ Gamma R2 adds:
 
 ### Prerequisites
 - Node.js
-- An Anthropic API key (Claude)
+- An Anthropic API key (Claude) — required
+- An OpenAI API key (GPT-4o-mini) — optional, for cross-model runs
+- A Google Gemini API key (Gemini 2.5 Flash) — optional, for cross-model runs
 
 ### Installation
 
 ```bash
-git clone https://github.com/socks5-sniffer/ARM.git
-cd ARM
+git clone https://github.com/socks5-sniffer/ARM-Protocol.git
+cd ARM-Protocol
 npm install
 ```
 
-Create a `.env` file (see `SECURITY.md` for key handling guidelines):
+Create a `.env` file from the provided template (see `SECURITY.md` for key handling guidelines):
 ```bash
-VITE_ANTHROPIC_API_KEY=your_key_here
+cp .env.example .env
+```
+
+Then fill in your keys:
+```bash
+VITE_ANTHROPIC_API_KEY=your_anthropic_key   # required
+VITE_OPENAI_API_KEY=your_openai_key         # optional — needed for GPT agent role
+VITE_GEMINI_API_KEY=your_gemini_key         # optional — needed for Gemini agent role
 ```
 
 Start the development server:
@@ -252,9 +261,11 @@ npm run dev
 
 | Stage | Budget | Rationale |
 |---|---|---|
-| R1 (all agents) | 3000t | Matched budgets for experimental consistency |
-| R2 Alpha/Beta | 4500t | Full deliberation with drift note |
-| Gamma R2 | 5500t | Reconciliation + RLHF audit requires largest context |
+| R1 (all agents) | 5000t | Matched budgets for experimental consistency |
+| R2 Alpha/Beta | 6500t | Full deliberation with drift note |
+| Gamma R2 | 8000t | Reconciliation + RLHF audit requires largest context |
+
+All token budgets are configurable via environment variables (`VITE_TOKENS_R1`, `VITE_TOKENS_R2`, `VITE_TOKENS_GAMMA`).
 
 ---
 
@@ -272,7 +283,7 @@ ARM's contribution is a **working protocol** that measures the specific mechanis
 
 ## 🗺️ Roadmap
 
-- **Cross-model agent pools** — Alpha=Claude, Beta=Gemini, Gamma=Claude to test whether model diversity reduces convergence and triggers `values`-level disagreement
+- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o-mini / Gemini 2.5 Flash) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
 - **Adversarial question design** — Expanding the test battery to questions with genuinely irreconcilable positions
 - **Zulu layer** — Cross-session temporal drift auditing (comparing the same question's outputs across separate sessions over time)
 - **Phase 3 Re-Queue loop** — Automated correction flag written back into trace store when drift exceeds threshold

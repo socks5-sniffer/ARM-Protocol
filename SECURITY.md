@@ -6,21 +6,22 @@ Currently, the `main` branch of ARM is the only supported version for security u
 
 ## 🔑 API Key Safety (Crucial)
 
-**ARM is currently architected as a client-side React prototype for research purposes.**
+**ARM is a client-side React research prototype (Vite + React 18).**
 
-Because of this architecture, API calls to LLM providers (Anthropic, Gemini, etc.) are made directly from the browser. 
+API calls to three LLM providers are made at runtime — Anthropic (Claude), OpenAI (GPT-4o-mini), and Google (Gemini 2.5 Flash).
 
-- **NEVER commit your `.env` file or hardcode your API keys into the source code.**
-- If you fork or deploy this application to the public web (e.g., Vercel, Netlify, GitHub Pages), **your API keys will be exposed to the public frontend**. 
-- Do not host this application publicly without first refactoring the API calls to a secure backend proxy (e.g., an Express.js server, Next.js API routes, or Firebase Cloud Functions).
+**Dev environment (local only):**
+The Vite dev server includes a proxy layer (`vite.config.js`) that routes `/api/anthropic` and `/gemini` through the local server, keeping API keys out of the browser network tab during development. Keys are loaded from `.env` via `VITE_*` environment variables.
 
-Please use strict budget limits and usage caps on your LLM provider console while developing locally.
+- **NEVER commit your `.env` file or hardcode any API key into source code.** All three keys (`VITE_ANTHROPIC_API_KEY`, `VITE_OPENAI_API_KEY`, `VITE_GEMINI_API_KEY`) must stay in `.env` which is excluded by `.gitignore`.
+- **Production / public hosting warning:** The Vite proxy is a dev-only tool. If you build and deploy to a public host (Vercel, Netlify, GitHub Pages, etc.), API keys injected as `VITE_*` variables will be visible in the compiled bundle. **Do not deploy publicly without first moving all API calls to a secure backend proxy** (e.g., an Express.js server, Next.js API routes, or serverless functions).
+- Set strict spend limits and usage caps in each provider's dashboard while developing locally (Anthropic, OpenAI, and Google AI Studio all support this).
 
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability within ARM, please do not disclose it publicly.
 
-Instead, please report it via email to: **[Your Email Address Here]**
+Instead, please open a [GitHub Security Advisory](https://github.com/socks5-sniffer/ARM-Protocol/security/advisories/new) in this repository, or contact the maintainer via GitHub.
 
 Please include:
 - A description of the vulnerability.
