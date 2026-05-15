@@ -8,7 +8,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 > **Current version:** `v0.6` · `src/App.jsx` · Model: `claude-sonnet-4-6`
 
----
+-----
 
 ## 🧠 The Problem: Persuasion Duality
 
