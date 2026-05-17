@@ -30,11 +30,12 @@ const PROVIDER_MODEL = {
   gemini: "gemini-2.5-flash",
 };
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1 || 5000);
-const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2 || 6500);
-const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 8000);
+// API keys are NOT read client-side. They are injected server-side by the Vite proxy.
+const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1) || 5000;
+const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2) || 6500;
+const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA) || 8000;
+
+const MAX_QUESTION_LENGTH = 4000;
 
 // ─── Asymmetric drift config ──────────────────────────────────────────────────
 const DRIFT_UP_THRESHOLD   = 0.04;   // tightened: memetic drift flag
@@ -261,11 +262,11 @@ async function callClaude(systemPrompt, userMessage, maxTokens) {
 
 async function callGPT(systemPrompt, userMessage, maxTokens) {
   const startMs = Date.now();
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  // Key is injected by the Vite proxy — do not send Authorization from the browser.
+  const res = await fetch("/api/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
       model: PROVIDER_MODEL.gpt,
@@ -296,8 +297,9 @@ async function callGPT(systemPrompt, userMessage, maxTokens) {
 
 async function callGemini(systemPrompt, userMessage, maxTokens) {
   const startMs = Date.now();
+  // Key is injected by the Vite proxy via x-goog-api-key header — not in the URL.
   const res = await fetch(
-    `/gemini/v1beta/models/${PROVIDER_MODEL.gemini}:generateContent?key=${GEMINI_API_KEY}`,
+    `/gemini/v1beta/models/${PROVIDER_MODEL.gemini}:generateContent`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -778,16 +780,14 @@ export default function ARM() {
     };
     const silentProvider = providers[silentAgent];
 
-    const missingKeys = [];
-    if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gpt") && !OPENAI_API_KEY) {
-      missingKeys.push("VITE_OPENAI_API_KEY");
-    }
-    if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gemini") && !GEMINI_API_KEY) {
-      missingKeys.push("VITE_GEMINI_API_KEY");
-    }
-    if (missingKeys.length > 0) {
+    if (!question.trim()) {
       setStatus("idle");
-      addLog(`Missing keys: ${[...new Set(missingKeys)].join(", ")}`);
+      addLog("No question provided.");
+      return;
+    }
+    if (question.length > MAX_QUESTION_LENGTH) {
+      setStatus("idle");
+      addLog(`Question exceeds ${MAX_QUESTION_LENGTH} character limit (${question.length} chars).`);
       return;
     }
 
@@ -1024,8 +1024,12 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         disabled={isRunning}
-        style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box", marginBottom: "1rem" }}
+        maxLength={MAX_QUESTION_LENGTH}
+        style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box", marginBottom: "0.25rem" }}
       />
+      <div style={{ fontSize: "0.58rem", color: question.length > MAX_QUESTION_LENGTH * 0.9 ? C.warn : C.muted, textAlign: "right", marginBottom: "0.75rem" }}>
+        {question.length}/{MAX_QUESTION_LENGTH}
+      </div>
 
       {/* Controls */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
