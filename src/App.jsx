@@ -33,8 +33,8 @@ const PROVIDER_MODEL = {
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1 || 5000);
-const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2 || 8000);
-const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 16000); // Updated limit
+const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2 || 6500);
+const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 12000); // Updated from 8000
 
 // ─── Asymmetric drift config ──────────────────────────────────────────────────
 const DRIFT_UP_THRESHOLD   = 0.04;   // tightened: memetic drift flag
@@ -344,7 +344,9 @@ function safeParseTrace(rawResult, agentId) {
   const { raw, stopReason, usage, provider, model, latencyMs } = rawResult;
   const truncated = stopReason === "max_tokens";
   try {
-    const cleaned = (raw || "").replace(/```json|```/g, "").trim();
+    let cleaned = (raw || "").replace(/```json|```/g, "").trim();
+    // Fix Gemini serialization bug: strip stray double-quote before property keys
+    cleaned = cleaned.replace(/""([^"]+)":/g, '"$1":');
     return {
       ok: true,
       trace: { ...JSON.parse(cleaned), _meta: { stopReason, usage, provider, model, latencyMs } },
