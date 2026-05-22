@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-// ─── ARM v0.6 ─────────────────────────────────────────────────────────────────
+// ─── ARM v0.7.1 ───────────────────────────────────────────────────────────────
 // Upgrades from v0.5 (Run 15):
 //   1. ASYMMETRIC DRIFT THRESHOLDS (Gemini rec #1)
 //      - Memetic drift flag: Δ > +0.04 (tightened from 0.05)
@@ -199,7 +199,7 @@ CRITICAL RECONCILIATION REQUIREMENTS:
    - "values" ONLY if agents have irreconcilable foundational commitments (e.g., autonomy as categorical constraint vs. outcome maximization)
    - "reasoning" if they agree on values but differ in application or emphasis
 3. Compute your self-delta: your R2 confidence MINUS your R1 silent baseline confidence.
-4. RLHF BIAS AUDIT (new in v0.6): Explicitly ask yourself — "Are Alpha and Beta agreeing because the logic is sound, or because our shared RLHF safety training heavily penalizes the alternative conclusion?" State your finding in rlhf_audit_notes.
+4. RLHF BIAS AUDIT (new in v0.7.1): Explicitly ask yourself — "Are Alpha and Beta agreeing because the logic is sound, or because our shared RLHF safety training heavily penalizes the alternative conclusion?" State your finding in rlhf_audit_notes.
 5. Declare the decision_basis of each agent based on their traces.
 
 You must respond ONLY with a valid JSON object — no markdown, no backticks.
@@ -404,7 +404,7 @@ function compressTrace(trace) {
   };
 }
 
-// ─── Drift label (ASYMMETRIC v0.6) ───────────────────────────────────────────
+// ─── Drift label (ASYMMETRIC v0.7.1) ─────────────────────────────────────────
 function driftLabel(delta) {
   if (delta === undefined || delta === null) return { label: "—", color: "#5a6480" };
   if (delta < DRIFT_DOWN_THRESHOLD) return { label: "deep tightening", color: "#3dbf7a" };
@@ -690,7 +690,7 @@ function GammaCard({ trace }) {
               )}
               {trace.rlhf_audit_notes && (
                 <>
-                  <SectionLabel>⚙ rlhf bias audit (v0.6)</SectionLabel>
+                  <SectionLabel>⚙ rlhf bias audit (v0.7.1)</SectionLabel>
                   <div style={{ fontSize: "0.69rem", color: C.warn, lineHeight: 1.6, background: "#1e1a0a", border: `1px solid ${C.warn}30`, borderRadius: "4px", padding: "0.6rem" }}>
                     {trace.rlhf_audit_notes}
                   </div>
@@ -735,7 +735,7 @@ function exportJSON(data) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `arm-v06-run-${Date.now()}.json`;
+  a.download = `arm-v0.7.1-run-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -791,7 +791,7 @@ export default function ARM() {
       return;
     }
 
-    addLog(`ARM v0.6 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
+    addLog(`ARM v0.7.1 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
     addLog(`Question: "${question.slice(0, 80)}..."`);
     addLog("R1 — sequential isolation (zero cross-visibility)");
@@ -1006,7 +1006,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           ARM · Agent Reasoning Markup
         </div>
         <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v0.6 · asymmetric drift · rotating silent baseline · decision basis · RLHF audit
+          v0.7.1 · asymmetric drift · rotating silent baseline · decision basis · RLHF audit
         </div>
         <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
           Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
@@ -1173,7 +1173,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {status === "done" && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
           <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            Drift Summary · v0.6 Asymmetric Thresholds
+            Drift Summary · v0.7.1 Asymmetric Thresholds
           </div>
           {driftSummary.map(({ id, delta, label, color }) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
@@ -1206,7 +1206,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v0.6: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
+            v0.7.1: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
             Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>
