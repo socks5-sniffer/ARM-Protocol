@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: arm-protocol
+  labels:
+    app: arm-protocol
+spec:
+  selector:
+    app: arm-protocol
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

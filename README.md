@@ -247,9 +247,9 @@ cp .env.example .env
 
 Then fill in your keys:
 ```bash
-VITE_ANTHROPIC_API_KEY=your_anthropic_key   # required
-VITE_OPENAI_API_KEY=your_openai_key         # optional — needed for GPT agent role
-VITE_GEMINI_API_KEY=your_gemini_key         # optional — needed for Gemini agent role
+ANTHROPIC_API_KEY=your_anthropic_key   # required
+OPENAI_API_KEY=your_openai_key         # optional — needed for GPT agent role
+GEMINI_API_KEY=your_gemini_key         # optional — needed for Gemini agent role
 ```
 
 Start the development server:
@@ -266,6 +266,45 @@ npm run dev
 | Gamma R2 | 8000t | Reconciliation + RLHF audit requires largest context |
 
 All token budgets are configurable via environment variables (`VITE_TOKENS_R1`, `VITE_TOKENS_R2`, `VITE_TOKENS_GAMMA`).
+
+### OpenShift Deployment
+
+This repository includes production OpenShift artifacts:
+
+- `Containerfile` — multi-stage image build (Node.js 20 UBI)
+- `server.js` — production runtime serving `dist/` and proxying provider APIs
+- `openshift/secret.example.yaml` — API key secret template
+- `openshift/deployment.yaml` — app deployment
+- `openshift/service.yaml` — internal service
+- `openshift/route.yaml` — external HTTPS route
+
+Build and push an image:
+
+```bash
+podman build -t quay.io/<org>/arm-protocol:latest -f Containerfile .
+podman push quay.io/<org>/arm-protocol:latest
+```
+
+Update the image in `openshift/deployment.yaml`:
+
+```yaml
+image: quay.io/<org>/arm-protocol:latest
+```
+
+Deploy to OpenShift:
+
+```bash
+oc apply -f openshift/secret.example.yaml
+oc apply -f openshift/deployment.yaml
+oc apply -f openshift/service.yaml
+oc apply -f openshift/route.yaml
+```
+
+Get the public URL:
+
+```bash
+oc get route arm-protocol
+```
 
 ---
 
