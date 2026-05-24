@@ -757,7 +757,7 @@ function GammaCard({ trace }) {
             </span>
             {trace.self_delta_vs_baseline !== undefined && (
               <span style={{ fontSize: "0.72rem", color: C.silent, fontFamily: f.mono }}>
-                self-Δ vs silent: {trace.self_delta_vs_baseline > 0 ? "+" : ""}{Number(trace.self_delta_vs_baseline || trace.drift_score?.confidence_delta || 0).toFixed(3)}
+                self-Δ vs silent: {trace.self_delta_vs_baseline > 0 ? "+" : ""}{Number(trace.self_delta_vs_baseline ?? trace.drift_score?.confidence_delta ?? 0).toFixed(3)}
               </span>
             )}
           </div>
