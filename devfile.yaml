@@ -1,0 +1,50 @@
+schemaVersion: 2.2.0
+metadata:
+  name: arm-protocol
+  displayName: ARM Protocol
+  description: ARM (Agent Reasoning Markup) React/Vite workspace for OpenShift Dev Spaces
+components:
+  - name: tools
+    container:
+      image: quay.io/devfile/universal-developer-image:latest
+      memoryLimit: 4Gi
+      cpuLimit: "2"
+      mountSources: true
+      endpoints:
+        - name: vite-dev
+          targetPort: 5173
+          exposure: public
+          protocol: https
+          secure: true
+commands:
+  - id: install
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: npm ci
+      group:
+        kind: build
+        isDefault: true
+  - id: dev
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: npm run dev
+      hotReloadCapable: true
+      group:
+        kind: run
+        isDefault: true
+  - id: build
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: npm run build
+      group:
+        kind: build
+  - id: preview
+    exec:
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: npm run preview
+      group:
+        kind: run

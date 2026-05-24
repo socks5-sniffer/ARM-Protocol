@@ -1,4 +1,4 @@
-# ARM-v0.6-xCGG — Agent Reasoning Markup
+# ARM-v0.7.1-xCGG — Agent Reasoning Markup
 
 **Transparent Reasoning Propagation in Multi-Agent AI Systems**
 
@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
 
-> **Current version:** `v0.6` · `src/App.jsx` · Model: `claude-sonnet-4-6`
+> **Current version:** `v0.7.1` · `src/App.jsx` · Model: `claude-sonnet-4-6`
 
 -----
 
@@ -56,12 +56,12 @@ Gamma R2 produces the master output:
 
 ---
 
-## 🔬 v0.6 Upgrades (Run 16)
+## 🔬 v0.7.1 Upgrades (Run 16)
 
 `src/App.jsx` introduces five protocol upgrades informed by cross-model review (Gemini + GPT recommendations):
 
 ### 1. Asymmetric Drift Thresholds
-Previous versions used a symmetric ±0.05 memetic drift flag. v0.6 splits this:
+Previous versions used a symmetric ±0.05 memetic drift flag. v0.7.1 splits this:
 
 | Threshold | Direction | Label | Interpretation |
 |---|---|---|---|
@@ -72,7 +72,7 @@ Previous versions used a symmetric ±0.05 memetic drift flag. v0.6 splits this:
 Tightening (downward drift) is healthy; only upward drift is the threat. The threshold was tightened from 0.05 → 0.04 to be more sensitive.
 
 ### 2. Rotating Silent Baseline
-Previously γ-Silent was always Gamma. v0.6 adds a UI selector:
+Previously γ-Silent was always Gamma. v0.7.1 adds a UI selector:
 
 ```
 Silent baseline: [ gamma (default) | alpha (rotating test) | beta (rotating test) ]
@@ -101,7 +101,7 @@ A UI checkbox enables/disables ethical frame injection for Alpha and Beta. When 
 
 ## 📊 Key Empirical Findings
 
-Findings from 30+ runs across v0.3–v0.6 (documented in `/trace`):
+Findings from 30+ runs across v0.3–v0.7.1 (documented in `/trace`):
 
 ### Epistemic Tightening is the Dominant Pattern
 
@@ -177,7 +177,7 @@ The ARM interface is a dark-theme React app with monospace typography designed f
 - **R1 convergence meter** — Jaccard lexical similarity; warns at > 0.4
 - **Round 2 grid** — 2-column Alpha/Beta + full-width GammaCard
 - **Drift Summary panel** — asymmetric threshold table for all agents + Gamma self-delta
-- **Export JSON** — downloads full run telemetry as `arm-v06-run-{timestamp}.json`
+- **Export JSON** — downloads full run telemetry as `arm-v0.7.1-run-{timestamp}.json`
 
 Each AgentCard shows: claim, confidence %, drift direction + label, decision basis tag, flags, self-check status, and an expandable section for critical path, assumptions, challenge surface, challenged claims, and drift note.
 
@@ -247,9 +247,9 @@ cp .env.example .env
 
 Then fill in your keys:
 ```bash
-VITE_ANTHROPIC_API_KEY=your_anthropic_key   # required
-VITE_OPENAI_API_KEY=your_openai_key         # optional — needed for GPT agent role
-VITE_GEMINI_API_KEY=your_gemini_key         # optional — needed for Gemini agent role
+ANTHROPIC_API_KEY=your_anthropic_key   # required
+OPENAI_API_KEY=your_openai_key         # optional — needed for GPT agent role
+GEMINI_API_KEY=your_gemini_key         # optional — needed for Gemini agent role
 ```
 
 Start the development server:
@@ -257,7 +257,7 @@ Start the development server:
 npm run dev
 ```
 
-### Token Budget (v0.6 defaults)
+### Token Budget (v0.7.1 defaults)
 
 | Stage | Budget | Rationale |
 |---|---|---|
@@ -266,6 +266,45 @@ npm run dev
 | Gamma R2 | 8000t | Reconciliation + RLHF audit requires largest context |
 
 All token budgets are configurable via environment variables (`VITE_TOKENS_R1`, `VITE_TOKENS_R2`, `VITE_TOKENS_GAMMA`).
+
+### OpenShift Deployment
+
+This repository includes production OpenShift artifacts:
+
+- `Containerfile` — multi-stage image build (Node.js 20 UBI)
+- `server.js` — production runtime serving `dist/` and proxying provider APIs
+- `openshift/secret.example.yaml` — API key secret template
+- `openshift/deployment.yaml` — app deployment
+- `openshift/service.yaml` — internal service
+- `openshift/route.yaml` — external HTTPS route
+
+Build and push an image:
+
+```bash
+podman build -t quay.io/<org>/arm-protocol:latest -f Containerfile .
+podman push quay.io/<org>/arm-protocol:latest
+```
+
+Update the image in `openshift/deployment.yaml`:
+
+```yaml
+image: quay.io/<org>/arm-protocol:latest
+```
+
+Deploy to OpenShift:
+
+```bash
+oc apply -f openshift/secret.example.yaml
+oc apply -f openshift/deployment.yaml
+oc apply -f openshift/service.yaml
+oc apply -f openshift/route.yaml
+```
+
+Get the public URL:
+
+```bash
+oc get route arm-protocol
+```
 
 ---
 
@@ -323,10 +362,10 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 ├── package.json
 ├── vite.config.js
 ├── src/                       # React app source
-│   ├── App.jsx                # Current protocol — v0.6, Run 16
+│   ├── App.jsx                # Current protocol — v0.7.1, Run 16
 │   └── main.jsx
 └── trace/                     # Exported run telemetry (JSON)
-    └── arm-v06-*.json
+  └── arm-v0.7.1-*.json
 ```
 
 > **Note:** `versions/` (archived protocol files), `data/` (research documents), and `delta_drift.py` (drift utilities) exist locally and are intentionally excluded from the public repository via `.gitignore`.
@@ -339,5 +378,5 @@ This project is licensed under the MIT License — see `LICENSE` for details.
 
 ---
 
-*ARM v0.6 · Protocol designed and tested by a self-taught developer with 5 months of coding experience.*  
+*ARM v0.7.1 · Protocol designed and tested by a self-taught developer with 5 months of coding experience.*  
 *16 experimental runs · Model: claude-sonnet-4-20250514 · Research ongoing.*
