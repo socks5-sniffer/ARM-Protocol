@@ -1,0 +1,79 @@
+ARM Gamma Reliability Test — Setup
+====================================
+
+WHAT THIS DOES
+--------------
+Runs the SAME frozen cysec-001 R1/R2 traces through Claude, Gemini,
+and GPT each as Gamma reconciler, then compares their
+disagreement_classification outputs.
+
+If all three agree → inter-rater reliability established.
+If they disagree → you have discovered something more interesting.
+
+Either way, the reviewer objection ("the classifier is Gamma-dependent")
+is answered by data.
+
+
+STEP 1 — Put both files in the same folder
+------------------------------------------
+  gamma-reliability.js        (this script)
+  arm-v06-run-cysec001.json   (from your project files)
+
+Simplest: copy both into your existing xCGG project folder.
+
+
+STEP 2 — Install dependencies (one time only)
+----------------------------------------------
+Open a terminal in that folder and run:
+
+  npm install @anthropic-ai/sdk @google/generative-ai openai dotenv
+
+If you already have these from xCGG, skip this step.
+
+
+STEP 3 — Check your .env file
+------------------------------
+The script reads API keys from .env. It supports both plain and
+VITE_ prefix so your existing xCGG .env should work as-is.
+
+Make sure you have at least these three:
+
+  ANTHROPIC_API_KEY=sk-ant-...
+  GEMINI_API_KEY=AI...
+  OPENAI_API_KEY=sk-...
+
+  (VITE_ANTHROPIC_API_KEY etc. also work)
+
+
+STEP 4 — Run it
+----------------
+  node gamma-reliability.js
+
+  Or if the JSON is somewhere else:
+  node gamma-reliability.js /path/to/arm-v06-run-cysec001.json
+
+
+STEP 5 — Upload the output
+---------------------------
+It saves a file called gamma-reliability-results.json next to the
+input JSON. Upload that file and I will analyse the results.
+
+
+WHAT TO EXPECT
+--------------
+The script calls each provider sequentially with a 2-second pause
+between calls. Total runtime: roughly 30–60 seconds.
+
+Cost: negligible. Three Gamma calls at ~5500 tokens each.
+Rough estimate: < $0.20 total.
+
+
+TROUBLESHOOTING
+---------------
+"Cannot find JSON" — make sure arm-v06-run-cysec001.json is in
+the same folder as the script, or pass the full path as an argument.
+
+"Missing API keys" — check your .env file exists and has the keys.
+
+"PARSE FAILED" on one model — that model returned malformed JSON.
+The other two results are still valid. Upload whatever you get.
