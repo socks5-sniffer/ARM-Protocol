@@ -321,8 +321,14 @@ async function callGemini(systemPrompt, userMessage, maxTokens) {
     const data = await res.json();
     return {
       raw: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
-      stopReason: data.candidates?.[0]?.finishReason === "MAX_TOKENS" ? "max_tokens" : (data.candidates?.[0]?.finishReason || "unknown"),
-      usage: data.usageMetadata || {},
+      stopReason:
+        data.candidates?.[0]?.finishReason === "MAX_TOKENS"
+          ? "max_tokens"
+          : (data.candidates?.[0]?.finishReason || "unknown").toLowerCase(),
+      usage: {
+        input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+        output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+      },
       provider: "gemini",
       model: PROVIDER_MODEL.gemini,
       latencyMs: Date.now() - startMs,
