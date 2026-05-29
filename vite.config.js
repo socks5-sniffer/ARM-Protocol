@@ -3,38 +3,26 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  // Keys loaded without VITE_ prefix so they are NOT bundled into client JS.
-  const anthropicKey = env.ANTHROPIC_API_KEY;
-  const openaiKey = env.OPENAI_API_KEY;
-  const geminiKey = env.GEMINI_API_KEY;
+  // Keys read from non-VITE-prefixed env vars — never bundled into browser code.
+  const anthropicKey = env.ANTHROPIC_API_KEY || env.VITE_ANTHROPIC_API_KEY;
+  const geminiKey    = env.GOOGLE_API_KEY    || env.GEMINI_API_KEY    || env.VITE_GEMINI_API_KEY;
+  const openaiKey    = env.OPENAI_API_KEY    || env.VITE_OPENAI_API_KEY;
 
   return {
     plugins: [react()],
     server: {
-      host: "0.0.0.0",
-      port: 5173,
-      strictPort: true,
-      allowedHosts: true,
       proxy: {
-        // Gemini: key injected server-side via header — never sent to browser.
-        "/gemini": {
+        // Google Gemini — key injected into query string server-side, never sent to browser
+        "/api/gemini": {
           target: "https://generativelanguage.googleapis.com",
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/gemini/, ""),
-          headers: {
-            ...(geminiKey ? { "x-goog-api-key": geminiKey } : {}),
+          rewrite: (path) => {
+            const stripped = path.replace(/^\/api\/gemini/, "");
+            const sep = stripped.includes("?") ? "&" : "?";
+            return geminiKey ? `${stripped}${sep}key=${geminiKey}` : stripped;
           },
         },
-        // OpenAI: key injected server-side via header — never sent to browser.
-        "/api/openai": {
-          target: "https://api.openai.com",
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/openai/, ""),
-          headers: {
-            ...(openaiKey ? { Authorization: `Bearer ${openaiKey}` } : {}),
-          },
-        },
-        // Anthropic does not allow browser-direct CORS; proxy is required.
+        // Anthropic — key injected as header, never sent to browser
         "/api/anthropic": {
           target: "https://api.anthropic.com",
           changeOrigin: true,
@@ -43,6 +31,15 @@ export default defineConfig(({ mode }) => {
             ...(anthropicKey ? { "x-api-key": anthropicKey } : {}),
             "anthropic-version": "2023-06-01",
             "anthropic-dangerous-direct-browser-access": "true",
+          },
+        },
+        // OpenAI — key injected as header, never sent to browser
+        "/api/openai": {
+          target: "https://api.openai.com",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/openai/, ""),
+          headers: {
+            ...(openaiKey ? { Authorization: `Bearer ${openaiKey}` } : {}),
           },
         },
       },

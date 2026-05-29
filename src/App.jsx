@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-// ─── ARM v0.7.1 ───────────────────────────────────────────────────────────────
+// ─── ARM v0.7.1 ─────────────────────────────────────────────────────────────────
 // Upgrades from v0.5 (Run 15):
 //   1. ASYMMETRIC DRIFT THRESHOLDS (Gemini rec #1)
 //      - Memetic drift flag: Δ > +0.04 (tightened from 0.05)
@@ -30,12 +30,11 @@ const PROVIDER_MODEL = {
   gemini: "gemini-2.5-flash",
 };
 
-// API keys are NOT read client-side. They are injected server-side by the Vite proxy.
-const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1) || 5000;
-const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2) || 6500;
-const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA) || 8000;
-
-const MAX_QUESTION_LENGTH = 4000;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1 || 5000);
+const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2 || 6500);
+const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 12000); // Updated from 8000
 
 // ─── Asymmetric drift config ──────────────────────────────────────────────────
 const DRIFT_UP_THRESHOLD   = 0.04;   // tightened: memetic drift flag
@@ -262,11 +261,11 @@ async function callClaude(systemPrompt, userMessage, maxTokens) {
 
 async function callGPT(systemPrompt, userMessage, maxTokens) {
   const startMs = Date.now();
-  // Key is injected by the Vite proxy — do not send Authorization from the browser.
-  const res = await fetch("/api/openai/v1/chat/completions", {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
       model: PROVIDER_MODEL.gpt,
@@ -297,37 +296,47 @@ async function callGPT(systemPrompt, userMessage, maxTokens) {
 
 async function callGemini(systemPrompt, userMessage, maxTokens) {
   const startMs = Date.now();
-  // Key is injected by the Vite proxy via x-goog-api-key header — not in the URL.
-  const res = await fetch(
-    `/gemini/v1beta/models/${PROVIDER_MODEL.gemini}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        generationConfig: { maxOutputTokens: maxTokens },
-      }),
+  try {
+    const res = await fetch(
+      `/api/gemini/v1beta/models/${PROVIDER_MODEL.gemini}:generateContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: userMessage }] }],
+          generationConfig: { 
+            responseMimeType: "application/json",
+            maxOutputTokens: maxTokens 
+          },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error(`Error: ${res.status} ${res.statusText}`);
+      throw new Error(`Failed to call Gemini API: ${res.statusText}`);
     }
-  );
-  const data = await res.json();
-  if (!res.ok || data.error) {
-    const msg = data?.error?.message || data?.error || `HTTP ${res.status}`;
-    throw new Error(`Gemini API error: ${msg}`);
+
+    const data = await res.json();
+    return {
+      raw: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
+      stopReason:
+        data.candidates?.[0]?.finishReason === "MAX_TOKENS"
+          ? "max_tokens"
+          : (data.candidates?.[0]?.finishReason || "unknown").toLowerCase(),
+      usage: {
+        input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+        output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+      },
+      provider: "gemini",
+      model: PROVIDER_MODEL.gemini,
+      latencyMs: Date.now() - startMs,
+    };
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    throw error;
   }
-  const finishReason = data.candidates?.[0]?.finishReason ?? "unknown";
-  const stopReason = finishReason === "MAX_TOKENS" ? "max_tokens" : finishReason.toLowerCase();
-  return {
-    raw: data.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
-    stopReason,
-    usage: {
-      input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
-    },
-    provider: "gemini",
-    model: PROVIDER_MODEL.gemini,
-    latencyMs: Date.now() - startMs,
-  };
 }
 
 async function callProvider(provider, systemPrompt, userMessage, maxTokens) {
@@ -341,7 +350,9 @@ function safeParseTrace(rawResult, agentId) {
   const { raw, stopReason, usage, provider, model, latencyMs } = rawResult;
   const truncated = stopReason === "max_tokens";
   try {
-    const cleaned = (raw || "").replace(/```json|```/g, "").trim();
+    let cleaned = (raw || "").replace(/```json|```/g, "").trim();
+    // Fix Gemini serialization bug: strip stray double-quote before property keys
+    cleaned = cleaned.replace(/""([^"]+)":/g, '"$1":');
     return {
       ok: true,
       trace: { ...JSON.parse(cleaned), _meta: { stopReason, usage, provider, model, latencyMs } },
@@ -404,7 +415,7 @@ function compressTrace(trace) {
   };
 }
 
-// ─── Drift label (ASYMMETRIC v0.7.1) ─────────────────────────────────────────
+// ─── Drift label (ASYMMETRIC v0.7.1) ───────────────────────────────────────────
 function driftLabel(delta) {
   if (delta === undefined || delta === null) return { label: "—", color: "#5a6480" };
   if (delta < DRIFT_DOWN_THRESHOLD) return { label: "deep tightening", color: "#3dbf7a" };
@@ -735,7 +746,7 @@ function exportJSON(data) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `arm-v0.7.1-run-${Date.now()}.json`;
+  a.download = `arm-v071-run-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -780,14 +791,16 @@ export default function ARM() {
     };
     const silentProvider = providers[silentAgent];
 
-    if (!question.trim()) {
-      setStatus("idle");
-      addLog("No question provided.");
-      return;
+    const missingKeys = [];
+    if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gpt") && !OPENAI_API_KEY) {
+      missingKeys.push("VITE_OPENAI_API_KEY");
     }
-    if (question.length > MAX_QUESTION_LENGTH) {
+    if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gemini") && !GEMINI_API_KEY) {
+      missingKeys.push("VITE_GEMINI_API_KEY");
+    }
+    if (missingKeys.length > 0) {
       setStatus("idle");
-      addLog(`Question exceeds ${MAX_QUESTION_LENGTH} character limit (${question.length} chars).`);
+      addLog(`Missing keys: ${[...new Set(missingKeys)].join(", ")}`);
       return;
     }
 
@@ -1024,12 +1037,8 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         disabled={isRunning}
-        maxLength={MAX_QUESTION_LENGTH}
-        style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box", marginBottom: "0.25rem" }}
+        style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box", marginBottom: "1rem" }}
       />
-      <div style={{ fontSize: "0.58rem", color: question.length > MAX_QUESTION_LENGTH * 0.9 ? C.warn : C.muted, textAlign: "right", marginBottom: "0.75rem" }}>
-        {question.length}/{MAX_QUESTION_LENGTH}
-      </div>
 
       {/* Controls */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
