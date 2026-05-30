@@ -149,15 +149,26 @@ app.use("/api/openai", async (req, res) => {
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
 
-  await proxyToProvider(
-    req,
-    res,
-    "https://api.openai.com",
-    "/v1/chat/completions",
-    {
-      Authorization: `Bearer ${key}`,
-    }
-  );
+  // Use clean minimal headers — forwarding browser headers triggers HTTP 421
+  // (Misdirected Request) on OpenAI's CDN due to HTTP/2 connection coalescing.
+  // Strip the /api/openai prefix to get the real upstream path.
+  const upstreamPath = req.path.replace(/^\/api\/openai/, "") || "/";
+  try {
+    const upstreamRes = await fetch(`https://api.openai.com${upstreamPath}`, {
+      method: req.method,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`,
+      },
+      body: req.body,
+    });
+    copyResponseHeaders(upstreamRes.headers, res);
+    const payload = Buffer.from(await upstreamRes.arrayBuffer());
+    res.status(upstreamRes.status).send(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown proxy error";
+    res.status(502).json({ error: `Proxy request failed: ${message}` });
+  }
 });
 
 app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req, res) => {

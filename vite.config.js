@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      // Allow all hosts — required for dynamic OpenShift Dev Spaces hostnames
+      allowedHosts: "all",
       proxy: {
         // Google Gemini — key injected into query string server-side, never sent to browser
         "/api/gemini": {

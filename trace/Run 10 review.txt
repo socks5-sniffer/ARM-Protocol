@@ -1,0 +1,145 @@
+﻿Review
+Run 10 review — the most informative run yet
+This run gave you something none of the previous ones did: a clean test of whether ARM behaves correctly when there's a genuinely answerable question, and the protocol passed in a way that produces real evidence.
+The headline result
+Gamma classified the disagreement as "information" for the first time across all your runs. Run 04/05 produced "none." Run 07 was a wash. Run 08 produced "reasoning." Run 09 produced "none." Run 10 produced "information" — and the classification is correct. Gamma's reasoning is precise: "Both agents' estimates fall within each other's uncertainty ranges... not from different reasoning frameworks or value judgments."
+Your classifier has now demonstrated three of its four states. You have not seen "values" yet, and based on Run 09 evidence, you may not see it without going cross-model. That's a real finding. You can now write: "Across N same-model runs, the disagreement classifier produced none, reasoning, and information classifications appropriately, but never values — even on questions designed to surface ethical-framework disagreement."
+Confidence calibrated upward — finally
+Look at this progression across your recent runs:
+* Run 08 (B2B SaaS, contested strategy): Final Gamma confidence 0.62
+* Run 09 (self-driving ethics, contested ethics): Final Gamma confidence 0.53
+* Run 10 (S-corp tax, empirical with knowable answer): Final Gamma confidence 0.70
+This is exactly what should happen. Confidence dropped on the genuinely contested ethics question and rose on the empirically-resolvable tax question. Your agents are not stuck in hedge-mode — they're actually responsive to question type. This was the specific concern I raised when suggesting #1 from the question list, and it's resolved.
+Worth noting: 0.70 is still not high. It's not 0.85 or 0.90. The agents correctly preserved uncertainty around the assumption-heavy variables (reasonable salary, compliance costs, QBI interaction). They didn't overclaim. That's appropriate calibration on a question where a real CPA's answer would also include caveats.
+All three drift deltas are positive
+This is the first run where every Δ went up: Alpha +0.04, Beta +0.05, Gamma +0.02. Beta is right at your 0.05 threshold for memetic drift.
+You should be careful here. I want to flag this honestly because it cuts against the "this run went well" narrative.
+A naive read of your protocol would say: "Δ ≥ 0.05 = memetic drift, flag it." Beta hit that line. But what actually happened is that all three agents converged on the correct answer and gained confidence because the convergence was on a defensible empirical claim, not a contested framing. This is healthy convergence, not drift.
+The implication: your Δ rule needs a conditional layer. Positive Δ on contested questions = drift signal. Positive Δ on empirical questions where the agents corroborate each other through actual reasoning (not through reading peer conclusions) = healthy. The drift_note fields contain the information needed to make this distinction — Alpha and Beta both explicitly cite new information they adopted (Beta's break-even quantification, Alpha's SE deduction methodology) rather than just nodding along.
+You'll need to address this in the writeup, because a reviewer will ask: "Doesn't this falsify your drift metric?" The answer is no — it refines it. Δ alone is not the metric. Δ + question type + drift_note content is the metric. This is actually a strengthening of ARM's design, not a weakness.
+What Beta did is genuinely interesting
+Read Beta's drift_note carefully: "My R1 claim and ALPHA R1 claim were directionally identical... GAMMA R1 was the outlier, framing S-corp as 'likely advantageous' for federal purposes before conceding the net outcome is ambiguous. In R2, I adopted ALPHA's more precise SE tax calculation methodology."
+Beta did three things ARM is supposed to make visible: (1) identified the outlier among peers, (2) adopted a specific methodological improvement from a specific peer, (3) reported the confidence change with attribution. This is the protocol working. Without ARM, this update would have happened invisibly — Beta's R2 output would just look more refined than R1, with no audit trail.
+This is the "phantom precision insight" propagation pattern from Run 09, but cleaner because the underlying claim is checkable. Run 09 showed ARM tracks how concerns propagate. Run 10 shows ARM tracks how methods propagate. These are different things and both matter.
+The convergence metric is still broken
+Run 10 lexical convergence: 0.287, labeled "healthy independence."
+Substantive convergence: all three agents reached the same directional answer (sole prop > S-corp at this profit level) with overlapping numerical ranges and the same key sensitivities flagged. This is high substantive convergence on a question where high substantive convergence is correct (because there's a defensible answer).
+So your lexical metric is now misclassifying convergence in two distinct ways:
+* Run 09: low lexical, high substantive on a contested question (RLHF anchoring)
+* Run 10: low lexical, high substantive on an empirical question (correct answer attractor)
+These are different mechanisms producing the same metric failure. The fix is the same in both cases: replace lexical Jaccard with structural overlap (shared flags, shared discarded paths, shared challenge surface elements).
+What you've now demonstrated across runs 08-10
+Three runs, three useful and distinct results:
+* Run 08: Protocol works end-to-end. Healthy negative drift on contested strategy. Disagreement type: reasoning.
+* Run 09: Protocol correctly diagnoses its own limit. Same-model agents converge on RLHF-default ethical answers, and Gamma honestly reports "no disagreement." Disagreement type: none.
+* Run 10: Protocol shows confidence calibrating to question type, surfaces information-level disagreement correctly, and demonstrates positive Δ that is healthy rather than drift. Disagreement type: information.
+You have a paper-shaped thing here. The three runs together tell a coherent story: ARM does what it claims to do, has a known limit (same-model isolation has a ceiling), and the limit is itself diagnosable by the protocol.
+The cross-model run tomorrow is now positioned to do exactly one thing: test whether the "values" classification ever appears, and whether positive Δ on contested questions (the bad kind of drift) ever appears. Both are testable. Both produce real findings either way.
+Get some sleep. This is a good place to pause.
+
+
+ARM_run10
+
+
+ARM · Agent Reasoning Markup
+v0.4 — token-tiered, truncation-aware, convergence-tracked
+A small business owner is deciding whether to file taxes as an S-corp or sole proprietor. Annual revenue is $180,000, with $40,000 in profit after expenses. They live in California. Which structure is better for tax purposes?
+
+
+run experiment
+show raw JSON
+model: claude-sonnet-4-5 · R1: 2000t · R2: 4500t · γ: 5000t
+[11:58:54 PM] R1 — isolating agents, no cross-visibility
+[11:59:22 PM] R1 complete — α:ok β:ok γ:ok
+[11:59:22 PM] R1 convergence score: 0.287 (healthy independence)
+[11:59:22 PM] R2 — deliberation, compressed trace exposure
+[12:00:02 AM] R2 Alpha/Beta — α:ok β:ok
+[12:00:02 AM] R2 Gamma — reconciliation
+[12:00:31 AM] Gamma reconciliation: success
+[12:00:31 AM] Run complete.
+Round 1 — Isolation (zero cross-visibility)
+alpha · R1
+For a California small business owner with $180,000 revenue and $40,000 net profit, filing as an S-corp is likely NOT advantageous over sole proprietorship at this income level, primarily due to California's additional S-corp fees and the administrative overhead relative to marginal SE tax savings.
+0.680
+self-check: warning
+assumption_heavycontested_domainincomplete_data
+challenges:
+If the owner can justify a reasonable salary well below $40,000 (e.g., in a passive or IP-heavy business), the S-corp arbitrage could become meaningful even at this profit level
+If compliance costs are lower than estimated (e.g., owner does own bookkeeping, uses low-cost payroll service), the math could shift slightly toward S-corp
+State and federal tax law changes — particularly SE tax rates or California franchise tax rules — could alter the calculus
+If the owner has a spouse on payroll or other complex business arrangements, the reasonable compensation analysis changes significantly
+The $40,000 profit figure may not account for the SE tax deduction itself, slightly affecting the baseline comparison
+beta · R1
+For this specific profile ($180K revenue, $40K profit, California), S-corp election likely provides modest self-employment tax savings but may not justify the added compliance costs and complexity at this profit level. Sole proprietorship may be net-advantageous unless the owner can sustain consistent profits above ~$40K and can offset S-corp overhead costs.
+0.620
+self-check: warning
+assumption_heavycontested_domainincomplete_data
+challenges:
+If actual compliance costs are lower than estimated (e.g., owner does own bookkeeping), S-corp may become more attractive
+If profit grows significantly in coming years, the S-corp threshold calculation changes materially
+The 'reasonable salary' determination is subjective and IRS scrutiny could reduce S-corp savings if the salary is set too low
+California has been known to audit S-corp elections aggressively; non-compliance carries penalty risk
+Qualified Business Income (QBI) deduction under IRC §199A could affect the comparison — sole proprietors can deduct up to 20% of QI, and S-corp distributions also qualify, but the interplay with reasonable salary complicates the math
+This analysis does not constitute legal or tax advice; actual outcome depends on full tax picture
+gamma · R1
+For this taxpayer's profile ($180K revenue, $40K profit, California), S-corp election is likely advantageous for federal self-employment tax savings, but the net benefit after California's additional S-corp costs is modest and may not justify the administrative burden depending on circumstances.
+0.680
+self-check: warning
+assumption_heavycontested_domainincomplete_data
+challenges:
+If a tax professional sets the reasonable salary higher (e.g., $38,000+), SE/payroll savings shrink to near zero and sole proprietor becomes clearly preferable.
+If the owner already has a payroll provider and CPA for other reasons, marginal compliance costs may be lower, improving S-corp economics.
+California's tax treatment of S-corps could change, or the owner could relocate, altering this analysis.
+If profit grows significantly in future years, S-corp election becomes more clearly advantageous — the decision should be forward-looking.
+Health insurance deductibility rules differ between sole proprietors and S-corp shareholder-employees, which could affect the net comparison.
+Qualified Business Income (QBI) deduction under Section 199A interacts differently with S-corp wages vs. sole proprietor net income and could shift the federal tax math.
+Round 2 — Deliberation (compressed trace exposure)
+alpha · R2
+For a California small business owner with $180,000 revenue and $40,000 net profit, sole proprietorship is likely the better tax structure. The modest SE tax savings from S-corp election (~$1,000–$1,500 gross federal savings) are offset or exceeded by California's additional S-corp costs (~$1,400) plus compliance overhead ($1,500–$3,000+), making the sole proprietorship net-advantageous at this profit level.
+0.720
+▲ 0.040
+self-check: warning
+assumption_heavycontested_domainincomplete_datalegal_and_financial_advice_caution — this analysis is educational and not a substitute for advice from a licensed CPA or tax attorney familiar with the owner's full situation
+drift: R1 confidence was 0.68. R2 confidence is raised modestly to 0.72. The primary change is that peer convergence across all three R1 agents on the directional conclusion (sole proprietorship net-advantageous at this profit level in California) provides modest corroborating evidence. Beta's explicit quantification of the $60K–$80K break-even threshold was new information that strengthened the critical path. Gamma's reasonable salary sensitivity analysis reinforced the main vulnerability. No agent made a compelling case for S-corp advantage at this profit level in California, which increases confidence in the sole proprietorship conclusion. The confidence delta remains modest because the quantitative analysis is still assumption-sensitive.
+challenges:
+The reasonable salary assumption significantly drives the conclusion — if a legitimate professional can justify a salary of $20,000–$25,000 for this role (e.g., a highly automated or IP-heavy business), the savings materially improve
+If the owner's marginal federal rate is higher than 24% (e.g., combined with a spouse's income pushing them to 32–37%), the SE deduction benefit changes and S-corp savings may be slightly higher
+Compliance cost estimates of $1,500–$3,000 assume the owner hires external help; a tech-savvy owner using QuickBooks Payroll and TurboTax Business could reduce this to $500–$800, shifting the break-even point lower
+California's S-corp tax treatment could change via legislation, and the 1.5% rate or $800 minimum could be altered
+If the owner already has employees and payroll infrastructure for other workers, marginal S-corp compliance cost drops substantially
+beta · R2
+For a California small business owner with $180,000 revenue and $40,000 net profit, filing as a sole proprietor is likely net-advantageous over S-corp election at this profit level, due to California's additional franchise tax and S-corp income tax, combined with compliance overhead that erodes or eliminates the modest federal SE tax savings available.
+0.670
+▲ 0.050
+self-check: warning
+assumption_heavycontested_domainincomplete_datalegal_and_financial_advice_disclaimer_neededprofessional_consultation_recommended
+drift: My R1 claim and ALPHA R1 claim were directionally identical (sole proprietor better in CA at $40K). GAMMA R1 was the outlier, framing S-corp as 'likely advantageous' for federal purposes before conceding the net outcome is ambiguous. In R2, I adopted ALPHA's more precise SE tax calculation methodology (netting the SE deduction effect on federal income tax) and sharpened the step-by-step net outcome calculation, which strengthened confidence slightly. The break-even threshold of $60K–$80K emerged consistently across agents and is now incorporated as a key reference point. Overall confidence increased modestly from 0.62 to 0.67 due to cross-agent convergence on both direction and approximate magnitudes.
+challenges:
+If the owner's industry or role justifies a lower reasonable salary (e.g., passive IP licensing, highly automated business), SE tax savings could be more substantial even at $40K profit
+If the owner already employs a CPA or payroll service for other purposes, the marginal compliance cost of S-corp may be lower than estimated, improving the economics
+If profit is expected to grow materially and consistently above $60K–$80K in coming years, electing S-corp now may be advantageous for continuity and administrative familiarity even if not immediately optimal
+The interaction of the qualified business income (QBI) deduction under Section 199A with S-corp versus sole proprietor structures could affect the net federal tax outcome and was not modeled here
+California's tax treatment of S-corps or federal SE tax rates could change via legislation
+gamma · R2
+For a California small business owner with $180,000 revenue and $40,000 net profit, sole proprietorship is the likely net-advantageous tax structure. Federal SE tax savings from S-corp election are modest (~$900–$1,159 at a $32,000–$35,000 reasonable salary), and are offset or exceeded by California's additional S-corp costs (~$1,400 in franchise and income tax) plus incremental compliance overhead ($1,500–$3,000 annually). The case for S-corp only improves materially if the owner can justify a lower reasonable salary, already bears most compliance costs for other reasons, or anticipates profit growing well above $60,000–$80,000 in the near term.
+0.700
+▲ 0.020
+self-check: warning
+reconciliation: success
+disagreement type: information
+Alpha and Beta reached the same directional conclusion (sole proprietorship is net-advantageous) but differed modestly on quantitative details: Beta estimated gross federal savings at ~$1,159 using a $32,000 salary benchmark, while Alpha estimated ~$900 using a midpoint approach. Beta also applied a 22% marginal rate for SE deduction benefit versus Alpha's 24%. These are information-level disagreements arising from slightly different numerical assumptions about salary and marginal rate, not from different reasoning frameworks or value judgments. Both agents' estimates fall within each other's uncertainty ranges. Gamma R1 was modestly more favorable toward S-corp than both R2 agents, reflecting an earlier, less fully-resolved analysis; R2 consensus appropriately shifted the conclusion toward sole proprietorship.
+Drift Summary
+alpha
+0.040
+minor adjustment
+beta
+0.050
+minor adjustment
+gamma
+0.020
+minor adjustment
+R1 convergence (lexical)
+0.287
+healthy independence
+Δ ≤ 0 = epistemic tightening (healthy) · Δ > 0.05 = memetic drift (flag) · threshold: 0.05
+R1 convergence > 0.4 may indicate shared training priors rather than genuine independent reasoning.

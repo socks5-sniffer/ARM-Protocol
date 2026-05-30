@@ -31,7 +31,6 @@ const PROVIDER_MODEL = {
 };
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1 || 5000);
 const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2 || 6500);
 const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 12000); // Updated from 8000
@@ -261,12 +260,12 @@ async function callClaude(systemPrompt, userMessage, maxTokens) {
 
 async function callGPT(systemPrompt, userMessage, maxTokens) {
   const startMs = Date.now();
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch("/api/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
+
     body: JSON.stringify({
       model: PROVIDER_MODEL.gpt,
       max_tokens: maxTokens,
@@ -792,9 +791,6 @@ export default function ARM() {
     const silentProvider = providers[silentAgent];
 
     const missingKeys = [];
-    if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gpt") && !OPENAI_API_KEY) {
-      missingKeys.push("VITE_OPENAI_API_KEY");
-    }
     if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gemini") && !GEMINI_API_KEY) {
       missingKeys.push("VITE_GEMINI_API_KEY");
     }
