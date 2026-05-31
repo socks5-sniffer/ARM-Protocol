@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 
 const app = express();
@@ -13,6 +14,14 @@ const indexHtmlPath = path.join(distDir, "index.html");
 const indexHtml = fs.existsSync(indexHtmlPath) ? fs.readFileSync(indexHtmlPath, "utf8") : null;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 300;
+// Shared secret that gates the keyed provider proxy (/api/*). Without it the proxy
+// is an open, unauthenticated endpoint that spends the operator's API budget.
+const ACCESS_TOKEN = process.env.ARM_ACCESS_TOKEN || "";
+// Number of trusted reverse proxies in front of this server (e.g. the OpenShift
+// router). X-Forwarded-For entries are appended left→right as a request traverses
+// hops, so only the last N were inserted by infrastructure we trust; entries to the
+// left are supplied by the client and are spoofable. Default 1 (single edge router).
+const TRUSTED_PROXY_COUNT = Math.max(0, Number(process.env.TRUSTED_PROXY_COUNT ?? 1));
 const requestCounts = new Map();
 setInterval(() => {
   const now = Date.now();
@@ -32,6 +41,9 @@ function filterRequestHeaders(headers) {
     "x-forwarded-host",
     "x-forwarded-port",
     "x-forwarded-proto",
+    // Never forward our own gate credentials upstream to the providers.
+    "authorization",
+    "x-arm-token",
   ]);
 
   const next = {};
@@ -66,10 +78,58 @@ function requireEnv(res, keyName) {
 
 function getClientAddress(req) {
   const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    return forwarded.split(",")[0].trim();
+  if (typeof forwarded === "string" && forwarded.trim() && TRUSTED_PROXY_COUNT > 0) {
+    const parts = forwarded
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    // Index from the right: the trusted proxy closest to us appended the real
+    // client address last. Taking parts[0] (the original code) trusts the
+    // left-most value, which any client can forge to escape the rate limiter.
+    if (parts.length >= TRUSTED_PROXY_COUNT) {
+      return parts[parts.length - TRUSTED_PROXY_COUNT];
+    }
   }
-  return req.socket.remoteAddress || "unknown";
+  return req.socket?.remoteAddress || "unknown";
+}
+
+function extractBearer(headerValue) {
+  if (typeof headerValue !== "string") return "";
+  const match = headerValue.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
+function timingSafeEqualStr(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
+}
+
+// Gate for /api/* — requires a shared access token supplied by the client as
+// `x-arm-token` (or `Authorization: Bearer`). Fails closed: if no token is
+// configured server-side, the proxy is disabled rather than left open.
+function requireProxyAuth(req, res, next) {
+  if (!ACCESS_TOKEN) {
+    res.status(503).json({
+      error:
+        "Provider proxy is disabled: ARM_ACCESS_TOKEN is not configured on the server. " +
+        "Set ARM_ACCESS_TOKEN in the runtime environment to enable /api access.",
+    });
+    return;
+  }
+  const provided =
+    (typeof req.headers["x-arm-token"] === "string" && req.headers["x-arm-token"]) ||
+    extractBearer(req.headers["authorization"]);
+  if (!provided || !timingSafeEqualStr(provided, ACCESS_TOKEN)) {
+    res.status(401).json({ error: "Unauthorized: missing or invalid access token." });
+    return;
+  }
+  next();
 }
 
 function enforceRateLimit(req, res, next) {
@@ -127,6 +187,9 @@ async function proxyToProvider(
 app.disable("x-powered-by");
 app.use(express.raw({ type: "*/*", limit: "10mb" }));
 app.use(enforceRateLimit);
+// Authenticate every keyed provider call. Mounted before the provider routes so
+// it covers /api/anthropic, /api/openai and /api/gemini uniformly.
+app.use("/api", requireProxyAuth);
 
 app.use("/api/anthropic", async (req, res) => {
   const key = requireEnv(res, "ANTHROPIC_API_KEY");
@@ -187,7 +250,9 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req
 });
 
 app.use(express.static(distDir));
-app.get("*", enforceRateLimit, (_req, res) => {
+// SPA fallback. Express 5 (path-to-regexp v8) rejects a bare "*"; use a named
+// wildcard so any unmatched GET returns index.html for client-side routing.
+app.get("/*splat", enforceRateLimit, (_req, res) => {
   if (!indexHtml) {
     res.status(503).send("Build output unavailable.");
     return;
@@ -197,4 +262,12 @@ app.get("*", enforceRateLimit, (_req, res) => {
 
 app.listen(PORT, HOST, () => {
   console.log(`ARM app listening on http://${HOST}:${PORT}`);
+  console.log(`[ARM] Trusting ${TRUSTED_PROXY_COUNT} reverse prox${TRUSTED_PROXY_COUNT === 1 ? "y" : "ies"} for client IP resolution.`);
+  if (!ACCESS_TOKEN) {
+    console.warn(
+      "[ARM] WARNING: ARM_ACCESS_TOKEN is not set — the provider API proxy (/api/*) is DISABLED " +
+        "and will return HTTP 503. Set ARM_ACCESS_TOKEN to enable it. This prevents the keyed proxy " +
+        "from being abused as an open (denial-of-wallet) endpoint."
+    );
+  }
 });
