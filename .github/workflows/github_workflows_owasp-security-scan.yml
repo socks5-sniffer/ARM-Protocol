@@ -181,10 +181,10 @@ jobs:
             exit 1
           fi
 
-          if grep -q '"/gemini"' vite.config.js; then
-            echo "✓ Gemini proxy route found"
+          if grep -q '"/api/gemini"' vite.config.js; then
+            echo "✓ /api/gemini proxy route found"
           else
-            echo "✗ Missing /gemini proxy route"
+            echo "✗ Missing /api/gemini proxy route"
             exit 1
           fi
 
