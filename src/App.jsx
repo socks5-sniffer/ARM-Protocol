@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useState } from "react";
 
-// ─── ARM v0.7.1 ─────────────────────────────────────────────────────────────────
+// ─── ARM v0.8 ───────────────────────────────────────────────────────────────────
 // Upgrades from v0.5 (Run 15):
 //   1. ASYMMETRIC DRIFT THRESHOLDS (Gemini rec #1)
 //      - Memetic drift flag: Δ > +0.04 (tightened from 0.05)
@@ -723,7 +723,10 @@ function GammaCard({ trace }) {
           <Tag color={disColor} bg={disColor + "20"}>disagreement: {disClass}</Tag>
         )}
         {trace.reconciliation_status && (
-          <Tag color={C.success}>{trace.reconciliation_status}</Tag>
+          <Tag color={trace.reconciliation_status === "gamma_flip_detected" ? C.warn : C.success}>{trace.reconciliation_status}</Tag>
+        )}
+        {trace.polarity_audit?.requires_manual_review === true && (
+          <Tag color={C.warn} bg={C.warn + "20"}>MANUAL REVIEW REQUIRED</Tag>
         )}
       </div>
 
@@ -837,7 +840,7 @@ async function exportJSON(data) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `arm-v071-run-${Date.now()}.json`;
+  a.download = `arm-v08-run-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -908,7 +911,7 @@ export default function ARM() {
       return;
     }
 
-    addLog(`ARM v0.7.1 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
+    addLog(`ARM v0.8 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
     addLog(`Question: "${question.slice(0, 80)}..."`);
     addLog("R1 — sequential isolation (zero cross-visibility)");
@@ -1248,7 +1251,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           ARM · Agent Reasoning Markup
         </div>
         <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v0.7.1 · asymmetric drift · rotating silent baseline · decision basis · RLHF audit
+          v0.8 · polarity gate · FAP circuit breaker · asymmetric drift · rotating silent baseline · RLHF audit
         </div>
         <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
           Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
@@ -1426,7 +1429,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {status === "done" && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
           <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            Drift Summary · v0.7.1 Asymmetric Thresholds
+            Drift Summary · v0.8 Asymmetric Thresholds
           </div>
           {driftSummary.map(({ id, delta, label, color }) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
@@ -1459,7 +1462,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v0.7.1: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
+            v0.8: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
             Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>
