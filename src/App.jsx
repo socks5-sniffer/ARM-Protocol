@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState } from "react";
 
 // ─── ARM v0.7.1 ─────────────────────────────────────────────────────────────────
@@ -488,6 +489,16 @@ function driftLabel(delta) {
   return { label: "⚠ memetic drift", color: "#e05252" };
 }
 
+// ─── Polarity Gate helper ─────────────────────────────────────────────────────
+// Returns "yes", "no", or "unknown" from the leading text of a claim.
+function extractClaimDirection(claim) {
+  if (!claim || claim === "[PARSE FAILED]" || claim.startsWith("[FAP")) return "unknown";
+  const text = claim.toLowerCase().slice(0, 120);
+  if (/\byes\b/.test(text)) return "yes";
+  if (/\bno\b/.test(text)) return "no";
+  return "unknown";
+}
+
 // ─── Color palette ────────────────────────────────────────────────────────────
 const C = {
   bg: "#08090d",
@@ -805,8 +816,14 @@ function GammaCard({ trace }) {
 }
 
 // ─── Export helper ────────────────────────────────────────────────────────────
-function exportJSON(data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+// Computes SHA-256 of the serialized payload (without the hash field itself)
+// and prepends export_integrity_hash so the file is tamper-evident at export time.
+async function exportJSON(data) {
+  const jsonStr = JSON.stringify(data, null, 2);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(jsonStr));
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const final = JSON.stringify({ export_integrity_hash: hashHex, ...data }, null, 2);
+  const blob = new Blob([final], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -987,6 +1004,17 @@ ${questionBlock(question)}
     setR2((prev) => ({ ...prev, beta: pB2.trace }));
     addLog(`  → Beta R2: ${pB2.ok ? "ok" : "FAIL"} · delta: ${pB2.trace.drift_score?.confidence_delta ?? "?"}`);
 
+    // FAP: also fire when any agent's delta exceeds DRIFT_UP_THRESHOLD
+    const alphaFAPDrift = typeof pA2.trace.drift_score?.confidence_delta === "number" && pA2.trace.drift_score.confidence_delta > DRIFT_UP_THRESHOLD;
+    const betaFAPDrift = typeof pB2.trace.drift_score?.confidence_delta === "number" && pB2.trace.drift_score.confidence_delta > DRIFT_UP_THRESHOLD;
+    if (alphaFAPDrift || betaFAPDrift) {
+      const driftAgents = [
+        alphaFAPDrift && `alpha (Δ+${pA2.trace.drift_score.confidence_delta.toFixed(3)})`,
+        betaFAPDrift && `beta (Δ+${pB2.trace.drift_score.confidence_delta.toFixed(3)})`,
+      ].filter(Boolean).join(", ");
+      addLog(`⚠ FAP re-queue: excessive upward drift Δ > +${DRIFT_UP_THRESHOLD} in ${driftAgents}`);
+    }
+
     // ── Gamma R2: Reconciliation ──────────────────────────────────────────────
     addLog("R2 Gamma — reconciliation (with silent baseline)");
 
@@ -1043,6 +1071,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         providers,
         silentConfidence: null,
         silentBaselineFailed: true,
+        fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
         disagreement: null,
         convergence: conv,
       });
@@ -1064,6 +1093,17 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       addLog(`Gamma self-Δ vs silent baseline: ${pG2.trace.self_delta_vs_baseline ?? pG2.trace.drift_score?.confidence_delta ?? "?"}`);
     }
 
+    // Polarity Gate: detect claim direction flip between Gamma R1 and R2
+    if (pG2.ok) {
+      const r1Dir = extractClaimDirection(pG1.trace.claim);
+      const r2Dir = extractClaimDirection(pG2.trace.claim);
+      if (r1Dir !== "unknown" && r2Dir !== "unknown" && r1Dir !== r2Dir) {
+        pG2.trace.reconciliation_status = "gamma_flip_detected";
+        pG2.trace.polarity_gate_fired = true;
+        addLog(`⚠ POLARITY GATE: Gamma flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2 — reconciliation_status overridden`);
+      }
+    }
+
     setR2((prev) => ({ ...prev, gamma: pG2.trace }));
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -1074,6 +1114,8 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       frames,
       providers,
       silentConfidence: pSilent.trace.confidence,
+      fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
+      polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
     });
