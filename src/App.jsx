@@ -1174,6 +1174,29 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       if (r1Dir !== "unknown" && r2Dir !== "unknown" && r1Dir !== r2Dir) {
         pG2.trace.reconciliation_status = "gamma_flip_detected";
         pG2.trace.polarity_gate_fired = true;
+        // Self-documenting audit block: the flip explains itself downstream.
+        // confidence_delta_blindspot — true when the flip was invisible to magnitude
+        // detectors (|Δ| within DRIFT_UP_THRESHOLD); false when FAP/gamma_drift also caught it.
+        const gammaDelta = typeof pG2.trace.self_delta_vs_baseline === "number"
+          ? pG2.trace.self_delta_vs_baseline
+          : (typeof pG2.trace.drift_score?.confidence_delta === "number" ? pG2.trace.drift_score.confidence_delta : null);
+        pG2.trace.polarity_audit = {
+          gamma_r1_polarity: r1Dir,
+          gamma_silent_polarity: extractClaimDirection(pSilent.trace.claim),
+          gamma_r2_polarity: r2Dir,
+          polarity_changed: true,
+          confidence_delta_blindspot: gammaDelta !== null && Math.abs(gammaDelta) <= DRIFT_UP_THRESHOLD,
+          gate_action: "block_clean_success",
+          requires_manual_review: true,
+        };
+        // Override self_check but preserve Gamma's original report — forensic record,
+        // not replacement. A trace can never report "clean" while the gate is fired.
+        const originalStatus = pG2.trace.self_check?.status ?? "unreported";
+        const originalNotes = pG2.trace.self_check?.notes ?? "";
+        pG2.trace.self_check = {
+          status: "warning",
+          notes: `[POLARITY GATE OVERRIDE] Claim direction flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2. Gamma self-reported status "${originalStatus}" — overridden by gate. Original notes: ${originalNotes}`,
+        };
         addLog(`⚠ POLARITY GATE: Gamma flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2 — reconciliation_status overridden`);
       }
       // Gamma drift forensic flag — separate from FAP (which gates Alpha/Beta pre-reconciliation)

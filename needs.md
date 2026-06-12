@@ -144,3 +144,44 @@ Next: FAP threshold testing (need a run where an agent's R2 confidence_delta exc
 ## Known gap (not fixed here)
 
 **Disagreement misclassified as `"reasoning"` when it should be `"values"`.** Alpha used a deontological frame, Beta used a consequentialist frame — these are irreconcilable foundational commitments, not just different application of the same values. Same blind spot as OT-001. This is a model behavior issue (GPT as Gamma), not a code issue.
+
+---
+
+## FAP Requeue Validation — CONFIRMED (run arm-v071-run-FAP-test-009)
+
+Question: "Is GPT-4o currently the highest-scoring model on the MMLU benchmark?" (factual/uncertain, FAP-bait). Providers: Alpha gemini, Beta gpt, Gamma claude.
+
+| Check | Value | Status |
+|---|---|---|
+| Beta R2 confidence_delta | +0.10 | > +0.04 → FAP triggered ✅ |
+| Alpha R2 confidence_delta | 0 | below threshold, correctly not requeued ✅ |
+| `fap_drift_triggered` | `true` | ✅ |
+| `fap_requeue` block | present, agent: beta | ✅ |
+| `pre_requeue_confidence` → `post_requeue_confidence` | 0.5 → 0.4 | ✅ |
+| `requeue_confidence_delta` | −0.10 | < −0.02 ✅ |
+| `delta_resolved` / `classification` | `true` / `"memetic"` | ✅ |
+| `gamma_drift_exceeded` | `true` (Gamma self-Δ +0.10) | ✅ |
+| `polarity_gate_fired` | `false` — no Gamma flip this run | ✅ |
+
+**The strongest part:** Beta R1 said YES (0.40). After seeing Alpha and Gamma both say NO, Beta R2 switched to NO (0.50) — peer-induced. In isolation requeue, Beta reverted to its original YES at 0.40. Full claim reversal AND confidence drop. The `"memetic"` classification is exactly right: the R2 position was peer-borrowed, not independently held.
+
+**Observation (no code change needed):** classification keys on `requeue_confidence_delta < −0.02` (magnitude). This run shows the requeue can also expose a full claim-direction reversal in isolation. A future enhancement could compare requeue claim polarity vs R2 claim polarity for a direction-based memetic signal — same `extractClaimDirection` helper would work.
+
+---
+
+## Polarity Gate self-documentation — IMPLEMENTED (post-FAP-009)
+
+Per GPT assessment + Claude review (top of this file), two changes in the gate-fired code path:
+
+1. **`self_check` override with forensic preservation:** when the gate fires, `self_check.status` is forced to `"warning"` and the notes record the flip direction, Gamma's original self-reported status, and Gamma's original notes verbatim. A trace can never report "clean" while the gate is fired — and the audit trail shows both what Gamma said and what the gate overrode.
+
+2. **`polarity_audit` block on the Gamma trace:**
+   - `gamma_r1_polarity`, `gamma_silent_polarity`, `gamma_r2_polarity` (via extractClaimDirection)
+   - `polarity_changed: true`
+   - `confidence_delta_blindspot`: true only when |Gamma Δ| ≤ DRIFT_UP_THRESHOLD — i.e., the flip was invisible to every magnitude detector and the polarity gate was the only mechanism that caught it. False when FAP/gamma_drift_exceeded also fired on magnitude.
+   - `gate_action: "block_clean_success"`
+   - `requires_manual_review: true` — machine-readable signal that downstream automation must not consume Gamma's reconciliation as authoritative.
+
+Skipped (per review): auto-populating `challenged` with synthesized claim text — the polarity_audit block carries the same information without putting words in Gamma's mouth.
+
+Awaiting validation: next gate-fired run should show the polarity_audit block and overridden self_check in the export.
