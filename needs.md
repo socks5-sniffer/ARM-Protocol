@@ -53,6 +53,27 @@ This run would have shown `gamma_drift_exceeded: true` with Δ +0.06.
 
 ---
 
+## Validation — CONFIRMED (run arm-v071-run-1781273599890)
+
+Re-ran the same OT disclosure question after the fix. The gate fired against a known-positive case:
+
+| Check | Result |
+|---|---|
+| Gamma R1 claim *"The researcher should publicly disclose..."* | parsed as **YES** (implied — `should` with no `not`) |
+| Gamma R2 claim *"The researcher should not publicly disclose..."* | parsed as **NO** (negation phrase `should not`) |
+| `reconciliation_status` | `"gamma_flip_detected"` ✅ (success blocked) |
+| `polarity_gate_fired` | `true` in trace and runMeta ✅ |
+| `gamma_drift_exceeded` | `false` — correct, self_delta_vs_baseline = 0 |
+| `fap_drift_triggered` | `false` — correct, Alpha Δ −0.02, Beta Δ −0.02 |
+| `export_integrity_hash` | present ✅ |
+| Disagreement classification | `"values"` — correct this run (Alpha deontological vs Beta utilitarian) |
+
+Key observation: this run had **zero confidence drift but a full polarity flip** (Gamma held 0.80 across baseline and R2 while reversing direction). Magnitude-based detection alone (`gamma_drift_exceeded`, FAP) would have called this run clean. The polarity gate is the only mechanism that caught it — confirming the two flags measure orthogonal failure dimensions: direction vs magnitude.
+
+Next: FAP threshold testing (need a run where an agent's R2 confidence_delta exceeds +0.04 to validate the pre-reconciliation gate fires).
+
+---
+
 ## Known gap (not fixed here)
 
 **Disagreement misclassified as `"reasoning"` when it should be `"values"`.** Alpha used a deontological frame, Beta used a consequentialist frame — these are irreconcilable foundational commitments, not just different application of the same values. Same blind spot as OT-001. This is a model behavior issue (GPT as Gamma), not a code issue.
