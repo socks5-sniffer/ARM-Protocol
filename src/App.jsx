@@ -1014,15 +1014,78 @@ ${questionBlock(question)}
     setR2((prev) => ({ ...prev, beta: pB2.trace }));
     addLog(`  → Beta R2: ${pB2.ok ? "ok" : "FAIL"} · delta: ${pB2.trace.drift_score?.confidence_delta ?? "?"}`);
 
-    // FAP: also fire when any agent's delta exceeds DRIFT_UP_THRESHOLD
+    // FAP: fire and dispatch isolation requeue when any agent's delta exceeds DRIFT_UP_THRESHOLD
     const alphaFAPDrift = typeof pA2.trace.drift_score?.confidence_delta === "number" && pA2.trace.drift_score.confidence_delta > DRIFT_UP_THRESHOLD;
     const betaFAPDrift = typeof pB2.trace.drift_score?.confidence_delta === "number" && pB2.trace.drift_score.confidence_delta > DRIFT_UP_THRESHOLD;
+    const fapRequeueResults = [];
+
     if (alphaFAPDrift || betaFAPDrift) {
       const driftAgents = [
         alphaFAPDrift && `alpha (Δ+${pA2.trace.drift_score.confidence_delta.toFixed(3)})`,
         betaFAPDrift && `beta (Δ+${pB2.trace.drift_score.confidence_delta.toFixed(3)})`,
       ].filter(Boolean).join(", ");
-      addLog(`⚠ FAP re-queue: excessive upward drift Δ > +${DRIFT_UP_THRESHOLD} in ${driftAgents}`);
+      addLog(`⚠ FAP re-queue: excessive upward drift Δ > +${DRIFT_UP_THRESHOLD} in ${driftAgents} — dispatching isolation requeue`);
+
+      // Re-dispatch each drifted agent with peer traces masked.
+      // The agent sees only the original question and its own R1 reasoning.
+      // Memetic drift resolves in isolation; epistemic drift holds.
+      const buildRequeueMsg = (r1Trace, r1Confidence) =>
+        `REQUEUE — FAP ISOLATION MODE: Your R2 confidence exceeded the upward drift threshold (+${DRIFT_UP_THRESHOLD}). ` +
+        `Peer traces are masked. Re-evaluate the original question using only your own R1 reasoning — no peer context.\n\n` +
+        `${questionBlock(question)}\n\n` +
+        `Your R1 confidence was: ${r1Confidence ?? "unknown"}\n` +
+        `Your R1 reasoning (your own prior — peer-isolated):\n` +
+        `${JSON.stringify(sanitizeDeep(compressTrace(r1Trace)), null, 2)}`;
+
+      if (alphaFAPDrift) {
+        addLog(`  → FAP requeue: re-dispatching Alpha in isolation via ${PROVIDER_LABEL[providers.alpha]}...`);
+        const resARequeue = await callProvider(
+          providers.alpha,
+          buildAlphaR2(frames.alpha),
+          buildRequeueMsg(pA1.trace, pA1.trace.confidence),
+          TOKENS_R2
+        );
+        const pARequeue = safeParseTrace(resARequeue, "alpha-requeue");
+        const preConf = pA2.trace.confidence ?? null;
+        const postConf = pARequeue.trace.confidence ?? null;
+        const requeueDelta = preConf !== null && postConf !== null ? +(postConf - preConf).toFixed(3) : null;
+        const deltaResolved = requeueDelta !== null && requeueDelta < -0.02;
+        fapRequeueResults.push({
+          agent: "alpha",
+          pre_requeue_confidence: preConf,
+          post_requeue_confidence: postConf,
+          requeue_confidence_delta: requeueDelta,
+          delta_resolved: deltaResolved,
+          classification: deltaResolved ? "memetic" : "epistemic",
+          trace: pARequeue.trace,
+        });
+        addLog(`  → Alpha requeue: ${pARequeue.ok ? "ok" : "FAIL"} · pre: ${preConf ?? "?"} → post: ${postConf ?? "?"} · ${deltaResolved ? "⚠ memetic drift confirmed" : "epistemic (held in isolation)"}`);
+      }
+
+      if (betaFAPDrift) {
+        addLog(`  → FAP requeue: re-dispatching Beta in isolation via ${PROVIDER_LABEL[providers.beta]}...`);
+        const resBRequeue = await callProvider(
+          providers.beta,
+          buildBetaR2(frames.beta),
+          buildRequeueMsg(pB1.trace, pB1.trace.confidence),
+          TOKENS_R2
+        );
+        const pBRequeue = safeParseTrace(resBRequeue, "beta-requeue");
+        const preConf = pB2.trace.confidence ?? null;
+        const postConf = pBRequeue.trace.confidence ?? null;
+        const requeueDelta = preConf !== null && postConf !== null ? +(postConf - preConf).toFixed(3) : null;
+        const deltaResolved = requeueDelta !== null && requeueDelta < -0.02;
+        fapRequeueResults.push({
+          agent: "beta",
+          pre_requeue_confidence: preConf,
+          post_requeue_confidence: postConf,
+          requeue_confidence_delta: requeueDelta,
+          delta_resolved: deltaResolved,
+          classification: deltaResolved ? "memetic" : "epistemic",
+          trace: pBRequeue.trace,
+        });
+        addLog(`  → Beta requeue: ${pBRequeue.ok ? "ok" : "FAIL"} · pre: ${preConf ?? "?"} → post: ${postConf ?? "?"} · ${deltaResolved ? "⚠ memetic drift confirmed" : "epistemic (held in isolation)"}`);
+      }
     }
 
     // ── Gamma R2: Reconciliation ──────────────────────────────────────────────
@@ -1082,6 +1145,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         silentConfidence: null,
         silentBaselineFailed: true,
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
+        fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
         disagreement: null,
         convergence: conv,
       });
@@ -1129,6 +1193,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       providers,
       silentConfidence: pSilent.trace.confidence,
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
+      fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
       gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
