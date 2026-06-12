@@ -490,12 +490,22 @@ function driftLabel(delta) {
 }
 
 // ─── Polarity Gate helper ─────────────────────────────────────────────────────
-// Returns "yes", "no", or "unknown" from the leading text of a claim.
+// Returns "yes", "no", or "unknown" from a claim string.
+// Handles explicit yes/no, start-of-claim patterns, negation phrases, and
+// implied YES when "should" appears with no negation ("not") present.
 function extractClaimDirection(claim) {
   if (!claim || claim === "[PARSE FAILED]" || claim.startsWith("[FAP")) return "unknown";
-  const text = claim.toLowerCase().slice(0, 120);
+  const text = claim.toLowerCase();
+  // Explicit yes/no at start (catches "No — ...", "Yes, ...")
+  if (/^no\b/.test(text)) return "no";
+  if (/^yes\b/.test(text)) return "yes";
+  // Explicit yes/no as standalone words anywhere in the full claim
   if (/\byes\b/.test(text)) return "yes";
   if (/\bno\b/.test(text)) return "no";
+  // Implied NO: negation phrases before an action verb
+  if (/\b(?:should not|must not|cannot|will not|should never|ought not)\b/.test(text)) return "no";
+  // Implied YES: "should" present with no negation ("not") anywhere in the claim
+  if (!/\bnot\b/.test(text) && /\bshould\b/.test(text)) return "yes";
   return "unknown";
 }
 
@@ -1102,6 +1112,10 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         pG2.trace.polarity_gate_fired = true;
         addLog(`⚠ POLARITY GATE: Gamma flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2 — reconciliation_status overridden`);
       }
+      // Gamma drift forensic flag — separate from FAP (which gates Alpha/Beta pre-reconciliation)
+      if (typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD) {
+        addLog(`⚠ Gamma drift exceeded threshold: self_delta_vs_baseline Δ +${pG2.trace.self_delta_vs_baseline.toFixed(3)}`);
+      }
     }
 
     setR2((prev) => ({ ...prev, gamma: pG2.trace }));
@@ -1116,6 +1130,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       silentConfidence: pSilent.trace.confidence,
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
+      gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
     });
