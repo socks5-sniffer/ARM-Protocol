@@ -841,7 +841,7 @@ async function exportJSON(data) {
   a.href = url;
   a.download = `arm-v08-run-${Date.now()}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
