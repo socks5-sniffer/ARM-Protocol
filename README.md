@@ -123,7 +123,7 @@ Validated: an agent that flipped YES→NO under peer pressure reverted to YES in
 `gamma_drift_exceeded` fires post-reconciliation when Gamma's `self_delta_vs_baseline` exceeds +0.04. Distinct from FAP (preventive, Alpha/Beta) — this is a forensic flag on the reconciler itself.
 
 ### 4. Export Integrity Hash
-Every exported run is sealed with a SHA-256 `export_integrity_hash` computed over the payload, independently verifiable by removing the hash field and re-hashing.
+Every exported run is sealed with a SHA-256 `export_integrity_hash` computed over the payload. To verify independently: remove the `export_integrity_hash` field, serialize the remaining object with `JSON.stringify(payload, null, 2)` (2-space indent, UTF-8), and SHA-256 hash the result. The implementation hashes exactly this representation, so verification must replicate the same serialization.
 
 ---
 
@@ -393,7 +393,7 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 │   ├── App.jsx                # Current protocol — v0.8
 │   └── main.jsx
 └── trace/                     # Exported run telemetry (JSON)
-  └── arm-v0.7.1-*.json
+  └── arm-v08-run-*.json
 ```
 
 > **Note:** `versions/` (archived protocol files), `data/` (research documents), and `delta_drift.py` (drift utilities) exist locally and are intentionally excluded from the public repository via `.gitignore`.
