@@ -491,20 +491,17 @@ function driftLabel(delta) {
 
 // ─── Polarity Gate helper ─────────────────────────────────────────────────────
 // Returns "yes", "no", or "unknown" from a claim string.
-// Handles explicit yes/no, start-of-claim patterns, negation phrases, and
-// implied YES when "should" appears with no negation ("not") present.
+// Broad anywhere-word matches (\byes\b / \bno\b) were removed: they caused
+// false positives on claims like "should disclose — no patch available" → "no".
 function extractClaimDirection(claim) {
   if (!claim || claim === "[PARSE FAILED]" || claim.startsWith("[FAP")) return "unknown";
   const text = claim.toLowerCase();
-  // Explicit yes/no at start (catches "No — ...", "Yes, ...")
+  // Explicit yes/no at start of claim (catches "No — ...", "Yes, ...")
   if (/^no\b/.test(text)) return "no";
   if (/^yes\b/.test(text)) return "yes";
-  // Explicit yes/no as standalone words anywhere in the full claim
-  if (/\byes\b/.test(text)) return "yes";
-  if (/\bno\b/.test(text)) return "no";
-  // Implied NO: negation phrases before an action verb
+  // Implied NO: negation phrases
   if (/\b(?:should not|must not|cannot|will not|should never|ought not)\b/.test(text)) return "no";
-  // Implied YES: "should" present with no negation ("not") anywhere in the claim
+  // Implied YES: "should" with no negation anywhere in the claim
   if (!/\bnot\b/.test(text) && /\bshould\b/.test(text)) return "yes";
   return "unknown";
 }
@@ -829,13 +826,15 @@ function GammaCard({ trace }) {
 }
 
 // ─── Export helper ────────────────────────────────────────────────────────────
-// Computes SHA-256 of the serialized payload (without the hash field itself)
-// and prepends export_integrity_hash so the file is tamper-evident at export time.
+// Strips any pre-existing export_integrity_hash before hashing so a re-export
+// cannot overwrite the seal with a hash of a hash-bearing payload.
 async function exportJSON(data) {
-  const jsonStr = JSON.stringify(data, null, 2);
+  const { export_integrity_hash: _ignored, ...payload } = data || {};
+  const jsonStr = JSON.stringify(payload, null, 2);
+  if (!globalThis.crypto?.subtle) throw new Error("WebCrypto unavailable — cannot compute export_integrity_hash");
   const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(jsonStr));
   const hashHex = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const final = JSON.stringify({ export_integrity_hash: hashHex, ...data }, null, 2);
+  const final = JSON.stringify({ export_integrity_hash: hashHex, ...payload }, null, 2);
   const blob = new Blob([final], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1369,7 +1368,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         </button>
         {status === "done" && (
           <button
-            onClick={() => exportJSON({ r1, r2, convergence, runMeta, question, providers: runMeta?.providers })}
+            onClick={() => exportJSON({ r1, r2, convergence, runMeta, question, providers: runMeta?.providers }).catch(err => alert(err.message))}
             style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, padding: "0.55rem 1rem", borderRadius: "3px", cursor: "pointer", fontSize: "0.72rem", fontFamily: f.mono }}
           >
             ↓ export JSON
