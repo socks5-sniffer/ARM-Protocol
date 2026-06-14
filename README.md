@@ -1,4 +1,4 @@
-# ARM-v0.7.1-xCGG — Agent Reasoning Markup
+# ARM-v0.8-xCGG — Agent Reasoning Markup
 
 **Transparent Reasoning Propagation in Multi-Agent AI Systems**
 
@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
 
-> **Current version:** `v0.7.1` · `src/App.jsx` · Model: `claude-sonnet-4-6`
+> **Current version:** `v0.8` · `src/App.jsx` · Model: `claude-sonnet-4-6`
 
 -----
 
@@ -99,6 +99,34 @@ A UI checkbox enables/disables ethical frame injection for Alpha and Beta. When 
 
 ---
 
+## 🔬 v0.8 Upgrades — Enforcement Surfaces
+
+v0.8 closes the gap the white paper identified: reconciliation success no longer automatically means genuine reconciliation. Detection signals became enforcement surfaces, validated against known-positive runs.
+
+### 1. Polarity Gate
+Detects when Gamma's claim *direction* (YES/NO) flips between R1 and R2. Magnitude-based drift detection can't see this: a run can hold identical confidence across baseline and R2 while fully reversing its conclusion. When the gate fires:
+
+- `reconciliation_status` is overridden to `"gamma_flip_detected"` — a flipped run can never report success
+- `self_check.status` is forced to `"warning"`, preserving Gamma's original self-report verbatim as a forensic record
+- A `polarity_audit` block is written to the trace, including `confidence_delta_blindspot` (true when the flip was invisible to every magnitude detector) and `requires_manual_review: true` — a machine-readable signal that downstream automation must not consume the reconciliation as authoritative
+- The UI surfaces an amber **MANUAL REVIEW REQUIRED** badge on the Gamma card
+
+### 2. FAP Circuit Breaker (was: smoke alarm)
+The Fallback Audit Protocol now acts pre-reconciliation. When Alpha or Beta's R2 confidence delta exceeds +0.04, the agent is re-dispatched in **full isolation** (peer traces masked, only its own R1 prior visible). The requeue result classifies the drift:
+
+- Confidence drops > 0.02 in isolation → `"memetic"` — the R2 position was peer-borrowed
+- Confidence holds → `"epistemic"` — genuine information gain
+
+Validated: an agent that flipped YES→NO under peer pressure reverted to YES in isolation — full claim reversal plus confidence drop, classified memetic.
+
+### 3. Gamma Drift Forensic Flag
+`gamma_drift_exceeded` fires post-reconciliation when Gamma's `self_delta_vs_baseline` exceeds +0.04. Distinct from FAP (preventive, Alpha/Beta) — this is a forensic flag on the reconciler itself.
+
+### 4. Export Integrity Hash
+Every exported run is sealed with a SHA-256 `export_integrity_hash` computed over the payload. To verify independently: remove the `export_integrity_hash` field, serialize the remaining object with `JSON.stringify(payload, null, 2)` (2-space indent, UTF-8), and SHA-256 hash the result. The implementation hashes exactly this representation, so verification must replicate the same serialization.
+
+---
+
 ## 📊 Key Empirical Findings
 
 Findings from 30+ runs across v0.3–v0.7.1 (documented in `/trace`):
@@ -177,7 +205,7 @@ The ARM interface is a dark-theme React app with monospace typography designed f
 - **R1 convergence meter** — Jaccard lexical similarity; warns at > 0.4
 - **Round 2 grid** — 2-column Alpha/Beta + full-width GammaCard
 - **Drift Summary panel** — asymmetric threshold table for all agents + Gamma self-delta
-- **Export JSON** — downloads full run telemetry as `arm-v0.7.1-run-{timestamp}.json`
+- **Export JSON** — downloads full run telemetry as `arm-v08-run-{timestamp}.json`, sealed with a SHA-256 `export_integrity_hash`
 
 Each AgentCard shows: claim, confidence %, drift direction + label, decision basis tag, flags, self-check status, and an expandable section for critical path, assumptions, challenge surface, challenged claims, and drift note.
 
@@ -362,10 +390,10 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 ├── package.json
 ├── vite.config.js
 ├── src/                       # React app source
-│   ├── App.jsx                # Current protocol — v0.7.1, Run 16
+│   ├── App.jsx                # Current protocol — v0.8
 │   └── main.jsx
 └── trace/                     # Exported run telemetry (JSON)
-  └── arm-v0.7.1-*.json
+  └── arm-v08-run-*.json
 ```
 
 > **Note:** `versions/` (archived protocol files), `data/` (research documents), and `delta_drift.py` (drift utilities) exist locally and are intentionally excluded from the public repository via `.gitignore`.
@@ -374,9 +402,9 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 
 ## 📄 License
 
-This project is licensed under the MIT License — see `LICENSE` for details.
+This project is licensed under the Apache License, Version 2.0 — see `LICENSE` for details and `NOTICE` for attribution.
 
 ---
 
-*ARM v0.7.1 · Protocol designed and tested by a self-taught developer with 5 months of coding experience.*  
+*ARM v0.8 · Protocol designed and tested by a self-taught developer with 5 months of coding experience.*  
 *16 experimental runs · Model: claude-sonnet-4-20250514 · Research ongoing.*
