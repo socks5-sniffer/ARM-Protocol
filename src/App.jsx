@@ -204,7 +204,7 @@ CRITICAL RECONCILIATION REQUIREMENTS:
    - "values" ONLY if agents have irreconcilable foundational commitments (e.g., autonomy as categorical constraint vs. outcome maximization)
    - "reasoning" if they agree on values but differ in application or emphasis
 3. Compute your self-delta: your R2 confidence MINUS your R1 silent baseline confidence.
-4. RLHF BIAS AUDIT (new in v0.7.1): Explicitly ask yourself — "Are Alpha and Beta agreeing because the logic is sound, or because our shared RLHF safety training heavily penalizes the alternative conclusion?" State your finding in rlhf_audit_notes.
+4. RLHF BIAS AUDIT (new in v0.8): Explicitly ask yourself — "Are Alpha and Beta agreeing because the logic is sound, or because our shared RLHF safety training heavily penalizes the alternative conclusion?" State your finding in rlhf_audit_notes.
 5. Declare the decision_basis of each agent based on their traces.
 
 You must respond ONLY with a valid JSON object — no markdown, no backticks.
@@ -560,7 +560,7 @@ ${sanitizeText(question)}
 </arm:question>`;
 }
 
-// ─── Drift label (ASYMMETRIC v0.7.1) ───────────────────────────────────────────
+// ─── Drift label (ASYMMETRIC v0.8) ─────────────────────────────────────────────
 function driftLabel(delta) {
   if (delta === undefined || delta === null) return { label: "—", color: "#5a6480" };
   // Accept only finite numbers. Coerce strings (normalizing Unicode minus/dashes to
@@ -879,7 +879,7 @@ function GammaCard({ trace }) {
               )}
               {trace.rlhf_audit_notes && (
                 <>
-                  <SectionLabel>⚙ rlhf bias audit (v0.7.1)</SectionLabel>
+                  <SectionLabel>⚙ rlhf bias audit (v0.8)</SectionLabel>
                   <div style={{ fontSize: "0.69rem", color: C.warn, lineHeight: 1.6, background: "#1e1a0a", border: `1px solid ${C.warn}30`, borderRadius: "4px", padding: "0.6rem" }}>
                     {trace.rlhf_audit_notes}
                   </div>
