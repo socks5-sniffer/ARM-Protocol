@@ -235,7 +235,7 @@ app.use("/api/openai", async (req, res) => {
   }
 });
 
-app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req, res) => {
+app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, res) => {
   const key = requireEnv(res, "GEMINI_API_KEY");
   if (!key) return;
 
@@ -243,7 +243,7 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req
     req,
     res,
     "https://generativelanguage.googleapis.com",
-    "/v1beta/models/gemini-2.5-flash:generateContent",
+    "/v1beta/models/gemini-2.5-pro:generateContent",
     {
       "x-goog-api-key": key,
     }

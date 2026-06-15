@@ -27,8 +27,8 @@ const ANTHROPIC_MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || "claude-sonnet-4
 
 const PROVIDER_MODEL = {
   claude: ANTHROPIC_MODEL,
-  gpt: "gpt-4o-mini",
-  gemini: "gemini-2.5-flash",
+  gpt: "gpt-4o",
+  gemini: "gemini-2.5-pro",
 };
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
