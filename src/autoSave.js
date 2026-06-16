@@ -9,8 +9,8 @@ export function buildFilename({ version, questionId, providers, roleInjection, s
     ? `all${first.charAt(0).toUpperCase() + first.slice(1)}`
     : providerSet.map((p) => (p ? p[0].toUpperCase() : "?")).join("");
   const roles = roleInjection ? "roles" : "noroles";
-  const silent = silentAgent !== "gamma" ? `-${silentAgent}Silent` : "";
-  const suffix = status === "done" ? "" : `-${status}`;
+  const silent = silentAgent && silentAgent !== "gamma" ? `-${silentAgent}Silent` : "";
+  const suffix = status && status !== "done" ? `-${status}` : "";
   const ts = Date.now();
   return `arm-v${version}-q${questionId}-${configId}-${roles}${silent}${suffix}-${ts}.json`;
 }
