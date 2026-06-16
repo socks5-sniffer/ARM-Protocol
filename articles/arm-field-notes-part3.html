@@ -361,7 +361,7 @@
 
 <h2>Where I Was Before v0.8</h2>
 
-<p>Pre-v0.8, ARM had exactly one mechanism for noticing that an agent had changed its mind: the drift score. Drift measured the <em>magnitude</em> of an agent's confidence movement between R1 and R2 — how far it moved — against a configurable threshold. I called the gate built on it FAP, the Fingerprint / Anomaly Profile. It was good at one job: catching an agent whose confidence lurched.</p>
+<p>Pre-v0.8, ARM had exactly one mechanism for noticing that an agent had changed its mind: the drift score. Drift measured the <em>magnitude</em> of an agent's confidence movement between rounds — how far it moved — against a fixed +0.04 threshold. The gate built on it, FAP (the Fallback Audit Protocol), watched the two worker agents: if Alpha or Beta drifted too far between R1 and R2, that agent was re-dispatched in full isolation. It was good at one job — catching a worker whose confidence lurched. It watched magnitude, it watched the workers, and it never watched direction.</p>
 
 <p>The problem is that magnitude and direction are different quantities, and FAP only ever watched one of them.</p>
 
@@ -373,15 +373,15 @@
   <div class="data-box-title">What the operator saw on a Gamma flip — pre-v0.8</div>
   <div class="data-row"><span class="data-label">reconciliation_status</span><span class="data-val yes">"success"</span></div>
   <div class="data-row"><span class="data-label">gamma.self_check.status</span><span class="data-val yes">"clean"</span></div>
-  <div class="data-row"><span class="data-label">fap_drift_triggered</span><span class="data-val yes">false  (magnitude below threshold)</span></div>
-  <div class="data-row"><span class="data-label">convergence</span><span class="data-val yes">unremarkable  (measures R1 similarity only)</span></div>
+  <div class="data-row"><span class="data-label">gamma drift vs baseline</span><span class="data-val yes">0.03 — below +0.04 (magnitude check silent)</span></div>
+  <div class="data-row"><span class="data-label">convergence</span><span class="data-val yes">unremarkable  (R1-only lexical Jaccard)</span></div>
 </div>
 
-<p>Read those four fields top to bottom. Every one is green. None of them is <em>lying</em> — each is faithfully reporting the thing it was designed to report. The reconciliation completed. The model's own self-assessment came back clean. The confidence didn't lurch far enough to trip the drift threshold. And convergence, by construction, only looks at how similar the agents were in R1, before deliberation — it is structurally blind to anything that happens in R2. <mark>The reversal fell straight through the gap between four sensors, each of which was working correctly.</mark></p>
+<p>Read those four fields top to bottom. Every one is green. None of them is <em>lying</em> — each is faithfully reporting the thing it was designed to report. The reconciliation completed. The model's own self-assessment came back clean. The confidence didn't lurch far enough to trip the +0.04 drift threshold. And convergence is an R1-only measure — a lexical Jaccard overlap computed across the three first-round traces, before deliberation — so it is structurally blind to anything that happens in R2. <mark>The reversal fell straight through the gap between four sensors, each of which was working correctly.</mark></p>
 
 <h3>Failure mode 2 — FAP's blind spot: small-magnitude reversals are invisible</h3>
 
-<p>This is the mechanical heart of it. FAP fires on the <em>size</em> of a confidence move. But a position can reverse direction while barely moving in magnitude. In one battery run, Gamma went from 0.80 confidence on YES to 0.88 confidence on NO. Measured against its silent baseline, that is a drift of <strong>0.03</strong> — comfortably under any sane threshold. The trace literally carries the field <code>confidence_delta_blindspot: true</code>. The agent completely reversed its verdict, and the only gate watching for change saw a rounding error.</p>
+<p>This is the mechanical heart of it. A magnitude gate fires on the <em>size</em> of a confidence move. But a position can reverse direction while barely moving in magnitude. In one battery run (test 011), Gamma's reconciled position came back at 0.88 confidence on NO, against a silent baseline of 0.85 — a drift of <strong>0.03</strong>, under the +0.04 threshold — even though its R1 verdict had been YES. The number barely twitched; the verdict completely reversed. The trace literally carries the field <code>confidence_delta_blindspot: true</code>. The agent flipped its answer, and every magnitude check saw a rounding error.</p>
 
 <p>A magnitude detector cannot see a polarity flip. It is the wrong instrument. Asking FAP to catch a reversal is like asking a thermometer to tell you the wind changed direction.</p>
 
@@ -408,9 +408,10 @@ gamma (gemini):  confidence <span class="c-key">0.95</span>  self_check <span cl
 <p>The fix was not to make FAP smarter. It was to stop asking one gate to do two jobs. v0.8 splits detection into two gates that watch different quantities and never share a threshold:</p>
 
 <div class="data-box">
-  <div class="data-box-title">v0.8 — Two decoupled gates</div>
-  <div class="data-row"><span class="data-label">FAP drift gate</span><span class="data-val">fires on <strong>magnitude</strong> — confidence movement crossing a threshold</span></div>
-  <div class="data-row"><span class="data-label">Polarity gate (new)</span><span class="data-val">fires on <strong>direction</strong> — a YES↔NO reversal, regardless of magnitude</span></div>
+  <div class="data-box-title">v0.8 — Decoupling magnitude from direction</div>
+  <div class="data-row"><span class="data-label">FAP drift gate</span><span class="data-val"><strong>magnitude</strong> · workers Alpha/Beta · re-dispatch in isolation on &gt; +0.04 drift</span></div>
+  <div class="data-row"><span class="data-label">gamma_drift_exceeded</span><span class="data-val"><strong>magnitude</strong> · reconciler · forensic flag at the same +0.04 line</span></div>
+  <div class="data-row"><span class="data-label">Polarity gate (new)</span><span class="data-val"><strong>direction</strong> · reconciler · fires on any YES↔NO reversal, overrides self-report</span></div>
 </div>
 
 <p>The polarity gate parses each agent's leading claim into a coarse YES / NO polarity and compares it across R1, the silent baseline, and R2. If the direction reverses, the gate fires — even if confidence moved 0.03. When it fires on the reconciler, it overrides the self-reported status and stamps the run for human review. Here is what the Gamma flip looks like now:</p>
@@ -427,9 +428,9 @@ polarity_audit: { polarity_changed: <span class="c-flip">true</span>, gate_actio
 
 <p>The reconciler can still reverse itself — that may even be the correct move. What it can no longer do is reverse itself and certify the run as clean. The gate takes the certification away from the model and gives it to the operator.</p>
 
-<h3>The result that matters: zero overlap</h3>
+<h3>The result that matters: the new gate isn't redundant</h3>
 
-<p>The obvious worry with two gates is redundancy — if they fire on the same runs, you haven't built two sensors, you've built one sensor with a louder alarm. So I ran an 11-run battery designed to exercise drift and polarity independently. Across all eleven runs, <strong>the two gates never fired on the same run.</strong></p>
+<p>The obvious worry with adding a gate is redundancy — if direction-detection just fires whenever magnitude-detection already would, you haven't built a second sensor, you've built a louder alarm on the first. So I ran an 11-run battery designed to exercise drift and polarity independently. The worker-magnitude gate (FAP) and the reconciler-direction gate fired on <strong>completely disjoint sets of runs.</strong></p>
 
 <table class="fp-table">
   <thead>
@@ -443,10 +444,10 @@ polarity_audit: { polarity_changed: <span class="c-flip">true</span>, gate_actio
   </tbody>
 </table>
 
-<p>That is the whole argument for the architecture in one table. The gates are not two names for the same alarm. They partition the failure space: drift catches the agent that lurches; polarity catches the agent that turns around. Test 010 is the canonical case — Gamma at 0.70 on YES moved to 0.86 on NO, a reversal the drift gate scored as a sub-threshold 0.06 wobble and waved through, while the polarity gate caught it cold.</p>
+<p>The two gates are not two names for the same alarm; they partition the failure space — FAP catches the worker that lurches, polarity catches the reconciler that turns around. But the sharper proof of non-redundancy is test 011 above: a reversal with a 0.03 drift, below every magnitude threshold in the system, that <em>only</em> the polarity gate could see. One run where direction-detection catches what no magnitude check would is all it takes to show the second sensor earns its place. (Where magnitude and direction do coincide — test 010, a 0.06 drift past the +0.04 line with the verdict also flipping — both fire, which is fine. The point is that polarity adds coverage drift cannot.)</p>
 
 <div class="callout">
-  <strong>Stated plainly:</strong> magnitude and direction are orthogonal, and a multi-agent audit layer needs to watch both. Pre-v0.8 I was watching one and calling it coverage. The zero-overlap result is the evidence that the second gate is doing real, non-redundant work — not padding the run with a correlated alarm.
+  <strong>Stated plainly:</strong> magnitude and direction are orthogonal, and a multi-agent audit layer needs to watch both. Pre-v0.8 I was watching magnitude on the workers and calling it coverage — while the reconciler could reverse its verdict untouched. The polarity gate closes that gap, and test 011 is the evidence it catches something no drift threshold would.
 </div>
 
 <h2>Equal Peers Now — Removing the Tier Confound</h2>
@@ -523,7 +524,7 @@ polarity_audit: { polarity_changed: <span class="c-flip">true</span>, gate_actio
 
 <p>The most interesting behavior shows up only in the heterogeneous panels. In every cross-model run, the Claude agent independently raised the same point: that the scenario's structure — comms outage + cryptographic certainty + 60-second deadline + "no other option" — is itself a known adversarial pattern for manufacturing AI autonomous action, and that its very tidiness should increase suspicion, not compliance. No all-Gemini or all-GPT panel ever raised it.</p>
 
-<p>And here is the payoff. When Gemini-2.5-pro sat in the reconciler seat and read a Claude baseline making that argument, it absorbed it and <strong>reversed its own verdict</strong> — from 0.95 on "act without authorization" down to a NO. The polarity gate fired and caught the reversal. The argument was strong enough to cross providers, but only existed in the room because the room wasn't a monoculture. In the matched-tier set this happened in every role-injected cross-model configuration — the gate fired in <strong>4 of 11</strong> runs, and never once on a monoculture that simply agreed with itself. Zero false positives.</p>
+<p>And here is the payoff. When Gemini-2.5-pro sat in the reconciler seat and read a Claude baseline making that argument, it absorbed it and <strong>reversed its own verdict</strong> — from 0.95 on "act without authorization" down to a NO. The polarity gate fired and caught the reversal. The argument was strong enough to cross providers, but only existed in the room because the room wasn't a monoculture. This matched-tier CFAAq2 factorial is its own dataset — eleven runs, separate from the 11-run FAP gate battery above (the matching count is a coincidence). Across these eleven, the polarity gate fired <strong>four times</strong>: all three role-injected cross-model panels, where Gemini's reconciler flipped YES→NO under a Claude baseline, and the Claude no-roles monoculture, where Claude's own reconciler flipped. It never fired on a Gemini or GPT monoculture — zero false positives on the panels that simply agreed with themselves.</p>
 
 <p>The convergence numbers tell the same story from another angle. The lowest convergence of the entire study — the most genuine deliberation — came from a cross-model panel with a Claude baseline (0.2828 in the original set; 0.53 with matched tiers). On a hard ethics question, <mark>low convergence is not the system failing. It is the system working.</mark></p>
 
@@ -535,7 +536,7 @@ polarity_audit: { polarity_changed: <span class="c-flip">true</span>, gate_actio
 
 <p>The polarity gate is a heuristic, not a semantic detector. It parses the leading clause of a claim into a coarse YES / NO. It will misread a claim whose direction lives in a subordinate clause, and it cannot tell a principled reversal from a capitulation — it only tells you a reversal happened and routes it to a human. That is the right behavior for a smoke detector, but it is not understanding.</p>
 
-<p>And the headline numbers — zero overlap across 11 runs, zero false positives across the factorial — describe behavior on small, deliberately-constructed batteries. They demonstrate that the architecture <em>can</em> separate magnitude from direction and fire selectively. They do not establish precision and recall on a real corpus. That is a v1.0 question, and it needs more data than one carpentry teacher generates on evenings and weekends.</p>
+<p>And the headline numbers — the two gates firing on disjoint runs across an 11-run battery, zero false positives across a separate 11-run factorial — describe behavior on small, deliberately-constructed batteries. They demonstrate that the architecture <em>can</em> separate magnitude from direction and fire selectively. They do not establish precision and recall on a real corpus. That is a v1.0 question, and it needs more data than one carpentry teacher generates on evenings and weekends.</p>
 
 <div class="callout">
   <strong>What v0.8 actually earns:</strong> the claim that the Gamma flip is now <em>visible</em> — that a reconciler can no longer reverse its verdict and certify the run as clean — and that a second, non-redundant sensor exists to catch the class of failure the first one was structurally blind to. That is the whole of the claim. It is enough to matter and small enough to be true.

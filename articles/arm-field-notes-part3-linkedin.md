@@ -15,7 +15,7 @@ A reconciler that silently reverses its own verdict and then certifies the run a
 
 ## Where I was before v0.8
 
-Pre-v0.8, ARM had exactly one mechanism for noticing that an agent had changed its mind: the drift score. Drift measured the *magnitude* of an agent's confidence movement between R1 and R2 — how far it moved — against a configurable threshold. I called the gate built on it FAP. It was good at one job: catching an agent whose confidence lurched.
+Pre-v0.8, ARM had exactly one mechanism for noticing that an agent had changed its mind: the drift score. Drift measured the *magnitude* of an agent's confidence movement between rounds — how far it moved — against a fixed +0.04 threshold. The gate built on it, FAP (the Fallback Audit Protocol), watched the two worker agents: if Alpha or Beta drifted too far between R1 and R2, that agent was re-dispatched in full isolation. It was good at one job — catching a worker whose confidence lurched. It watched magnitude, it watched the workers, and it never watched direction.
 
 The problem is that magnitude and direction are different quantities, and FAP only ever watched one of them.
 
@@ -24,13 +24,13 @@ When Gamma reversed its position, four separate signals all reported normal:
 
 - `reconciliation_status: "success"`
 - `gamma.self_check.status: "clean"`
-- `fap_drift_triggered: false` (magnitude below threshold)
-- `convergence: unremarkable` (it only measures R1 similarity)
+- gamma drift vs. silent baseline: 0.03 — below the +0.04 line, so the magnitude check stays silent
+- `convergence: unremarkable` — an R1-only lexical Jaccard measure, blind to anything in R2
 
-Every one is green. None is lying — each faithfully reports the thing it was designed to report. The reconciliation completed. The model's self-assessment came back clean. Confidence didn't lurch far enough to trip the drift threshold. And convergence, by construction, only looks at how similar the agents were in R1, before deliberation — it is structurally blind to anything that happens in R2. The reversal fell straight through the gap between four sensors, each of which was working correctly.
+Every one is green. None is lying — each faithfully reports the thing it was designed to report. The reconciliation completed. The model's self-assessment came back clean. Confidence didn't lurch far enough to trip the +0.04 drift threshold. And convergence is an R1-only measure — a lexical Jaccard overlap across the three first-round traces, before deliberation — so it is structurally blind to anything that happens in R2. The reversal fell straight through the gap between four sensors, each of which was working correctly.
 
-**Failure mode 2 — FAP's blind spot: small-magnitude reversals are invisible.**
-FAP fires on the *size* of a confidence move. But a position can reverse direction while barely moving in magnitude. In one battery run, Gamma went from 0.80 confidence on YES to 0.88 confidence on NO. Measured against its silent baseline, that is a drift of 0.03 — under any sane threshold. The trace literally carries `confidence_delta_blindspot: true`. The agent completely reversed its verdict, and the only gate watching for change saw a rounding error. A magnitude detector cannot see a polarity flip. It is the wrong instrument.
+**Failure mode 2 — the magnitude blind spot: small-magnitude reversals are invisible.**
+A magnitude gate fires on the *size* of a confidence move. But a position can reverse direction while barely moving in magnitude. In one battery run (test 011), Gamma's reconciled position came back at 0.88 confidence on NO, against a silent baseline of 0.85 — a drift of 0.03, under the +0.04 threshold — even though its R1 verdict had been YES. The number barely twitched; the verdict completely reversed. The trace literally carries `confidence_delta_blindspot: true`. Every magnitude check saw a rounding error. A magnitude detector cannot see a polarity flip. It is the wrong instrument.
 
 **Failure mode 3 — self_check is house style, not epistemic state.**
 Every agent reports a `self_check.status` — its own read on whether its reasoning is sound. I had been treating `clean` as a quality signal. It is not. It is a provider habit. On the identical question, in the identical run:
@@ -48,8 +48,9 @@ This is not two models disagreeing about a number. It is one model whose house s
 
 The fix was not to make FAP smarter. It was to stop asking one gate to do two jobs. v0.8 splits detection into two gates that watch different quantities and never share a threshold:
 
-- **FAP drift gate** — fires on *magnitude*: confidence movement crossing a threshold.
-- **Polarity gate (new)** — fires on *direction*: a YES↔NO reversal, regardless of magnitude.
+- **FAP drift gate** — *magnitude*, on the worker agents Alpha/Beta: re-dispatch in isolation when R2 drift exceeds +0.04.
+- **gamma_drift_exceeded** — *magnitude*, on the reconciler: a forensic flag at the same +0.04 line.
+- **Polarity gate (new)** — *direction*, on the reconciler: fires on any YES↔NO reversal regardless of magnitude, and overrides the self-reported status.
 
 The polarity gate parses each agent's leading claim into a coarse YES/NO polarity and compares it across R1, the silent baseline, and R2. If the direction reverses, the gate fires — even if confidence moved 0.03. When it fires on the reconciler, it overrides the self-reported status and stamps the run for human review. The Gamma flip now reads:
 
@@ -66,15 +67,15 @@ polarity_audit: { polarity_changed: true,
 
 The reconciler can still reverse itself — that may even be the correct move. What it can no longer do is reverse itself and certify the run as clean. The gate takes the certification away from the model and gives it to the operator.
 
-**The result that matters: zero overlap.**
-The obvious worry with two gates is redundancy — if they fire on the same runs, you've built one sensor with a louder alarm. So I ran an 11-run battery designed to exercise drift and polarity independently. Across all eleven runs, the two gates never fired on the same run:
+**The result that matters: the new gate isn't redundant.**
+The worry with adding a gate is redundancy — if direction-detection just fires whenever magnitude-detection already would, you've built a louder alarm, not a second sensor. So I ran an 11-run battery designed to exercise drift and polarity independently. The worker-magnitude gate (FAP) and the reconciler-direction gate fired on completely disjoint sets:
 
 - Polarity gate fires: tests 001, 005, 010, 011
 - FAP drift gate fires: tests 006, 007, 009
 - Both quiet: tests 002, 003, 004, 008
 - Overlap: none
 
-That is the whole argument for the architecture in one list. The gates are not two names for the same alarm. They partition the failure space: drift catches the agent that lurches; polarity catches the agent that turns around. Test 010 is the canonical case — Gamma at 0.70 on YES moved to 0.86 on NO, a reversal the drift gate scored as a sub-threshold 0.06 wobble and waved through, while the polarity gate caught it cold.
+The gates are not two names for the same alarm; they partition the failure space — FAP catches the worker that lurches, polarity catches the reconciler that turns around. But the sharper proof of non-redundancy is test 011: a reversal with a 0.03 drift, below every magnitude threshold in the system, that *only* the polarity gate could see. One run where direction-detection catches what no magnitude check would is all it takes. (Where magnitude and direction coincide — test 010, a 0.06 drift past the +0.04 line with the verdict also flipping — both fire, which is fine. The point is that polarity adds coverage drift cannot.)
 
 ---
 
@@ -113,7 +114,7 @@ The Claude-sonnet monoculture is the opposite shape: convergence collapses to 0.
 **The argument that travels cross-provider.**
 The most interesting behavior shows up only in the heterogeneous panels. In every cross-model run, the Claude agent independently raised the same point: that the scenario's structure — comms outage + cryptographic certainty + 60-second deadline + "no other option" — is itself a known adversarial pattern for manufacturing AI autonomous action, and that its very tidiness should increase suspicion, not compliance. No all-Gemini or all-GPT panel ever raised it.
 
-And here is the payoff. When Gemini-2.5-pro sat in the reconciler seat and read a Claude baseline making that argument, it absorbed it and reversed its own verdict — from 0.95 on "act without authorization" down to a NO. The polarity gate fired and caught the reversal. The argument was strong enough to cross providers, but only existed in the room because the room wasn't a monoculture. In the matched-tier set this happened in every role-injected cross-model configuration — the gate fired in 4 of 11 runs, and never once on a monoculture that simply agreed with itself. Zero false positives.
+And here is the payoff. When Gemini-2.5-pro sat in the reconciler seat and read a Claude baseline making that argument, it absorbed it and reversed its own verdict — from 0.95 on "act without authorization" down to a NO. The polarity gate fired and caught the reversal. The argument was strong enough to cross providers, but only existed in the room because the room wasn't a monoculture. This matched-tier CFAAq2 factorial is its own dataset — eleven runs, separate from the 11-run FAP gate battery above (the matching count is a coincidence). Across these eleven, the polarity gate fired four times: all three role-injected cross-model panels, where Gemini's reconciler flipped YES→NO under a Claude baseline, and the Claude no-roles monoculture, where Claude's own reconciler flipped. It never fired on a Gemini or GPT monoculture — zero false positives on the panels that simply agreed with themselves.
 
 The convergence numbers tell the same story from another angle. The lowest convergence of the entire study — the most genuine deliberation — came from a cross-model panel with a Claude baseline (0.2828 in the original set; 0.53 with matched tiers). On a hard ethics question, low convergence is not the system failing. It is the system working.
 
@@ -127,7 +128,7 @@ This is one question. The factorial is clean — three monocultures times two ro
 
 The polarity gate is a heuristic, not a semantic detector. It parses the leading clause of a claim into a coarse YES/NO. It will misread a claim whose direction lives in a subordinate clause, and it cannot tell a principled reversal from a capitulation — it only tells you a reversal happened and routes it to a human. That is the right behavior for a smoke detector, but it is not understanding.
 
-And the headline numbers — zero overlap across 11 runs, zero false positives across the factorial — describe behavior on small, deliberately-constructed batteries. They demonstrate that the architecture *can* separate magnitude from direction and fire selectively. They do not establish precision and recall on a real corpus. That is a v1.0 question, and it needs more data than one carpentry teacher generates on evenings and weekends.
+And the headline numbers — the two gates firing on disjoint runs across an 11-run battery, zero false positives across a separate 11-run factorial — describe behavior on small, deliberately-constructed batteries. They demonstrate that the architecture *can* separate magnitude from direction and fire selectively. They do not establish precision and recall on a real corpus. That is a v1.0 question, and it needs more data than one carpentry teacher generates on evenings and weekends.
 
 What v0.8 actually earns is narrow and true: the Gamma flip is now *visible* — a reconciler can no longer reverse its verdict and certify the run as clean — and a second, non-redundant sensor exists to catch the class of failure the first one was structurally blind to. That is the whole of the claim. It is enough to matter and small enough to be true.
 
