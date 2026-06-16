@@ -2,11 +2,12 @@
 // Auto-save helpers — called at run completion to write traces to trace/
 
 export function buildFilename({ version, questionId, providers, roleInjection, silentAgent, status }) {
-  const providerSet = [providers?.alpha, providers?.beta, providers?.gamma];
-  const allSame = providerSet.every((p) => p === providerSet[0]);
+  const providerSet = [providers?.alpha, providers?.beta, providers?.gamma].map((p) => (typeof p === "string" ? p : ""));
+  const first = providerSet[0];
+  const allSame = Boolean(first) && providerSet.every((p) => p === first);
   const configId = allSame
-    ? `all${providerSet[0].charAt(0).toUpperCase() + providerSet[0].slice(1)}`
-    : providerSet.map((p) => p?.[0]?.toUpperCase() ?? "?").join("");
+    ? `all${first.charAt(0).toUpperCase() + first.slice(1)}`
+    : providerSet.map((p) => (p ? p[0].toUpperCase() : "?")).join("");
   const roles = roleInjection ? "roles" : "noroles";
   const silent = silentAgent !== "gamma" ? `-${silentAgent}Silent` : "";
   const suffix = status === "done" ? "" : `-${status}`;
