@@ -30,6 +30,6 @@ export async function saveTrace(data, filename, accessToken) {
       console.warn("[ARM] auto-save failed:", err.error || resp.status);
     }
   } catch (err) {
-    console.warn("[ARM] auto-save error:", err.message);
+    console.warn("[ARM] auto-save error:", err instanceof Error ? err.message : String(err));
   }
 }
