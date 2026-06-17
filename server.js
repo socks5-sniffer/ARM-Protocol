@@ -260,8 +260,15 @@ app.use("/api/openai", async (req, res) => {
 });
 
 app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req, res) => {
-  const key = requireEnv(res, "GEMINI_API_KEY");
-  if (!key) return;
+  // Accept either name, matching .env.example and the Vite dev proxy
+  // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
+  const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) {
+    res.status(500).json({
+      error: "GOOGLE_API_KEY (or GEMINI_API_KEY) is not configured in the runtime environment.",
+    });
+    return;
+  }
 
   await proxyToProvider(
     req,
