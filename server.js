@@ -57,7 +57,16 @@ function filterRequestHeaders(headers) {
 }
 
 function copyResponseHeaders(upstreamHeaders, res) {
-  const blocked = new Set(["content-encoding", "transfer-encoding", "connection"]);
+  // Drop hop-by-hop / encoding headers. content-length is dropped because Node's
+  // fetch transparently decompresses gzip/br bodies while leaving the original
+  // (compressed) content-length on the headers; forwarding it would mismatch the
+  // re-sent buffer and truncate/hang the client. Express sets it from the payload.
+  const blocked = new Set([
+    "content-encoding",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+  ]);
 
   for (const [key, value] of upstreamHeaders.entries()) {
     if (!blocked.has(key.toLowerCase())) {
@@ -101,14 +110,12 @@ function extractBearer(headerValue) {
 }
 
 function timingSafeEqualStr(a, b) {
-  const ab = Buffer.from(String(a));
-  const bb = Buffer.from(String(b));
-  if (ab.length !== bb.length) return false;
-  try {
-    return crypto.timingSafeEqual(ab, bb);
-  } catch {
-    return false;
-  }
+  // Hash both sides to a fixed 32-byte digest before comparing. This keeps the
+  // comparison constant-time AND avoids leaking the secret's length via the
+  // early length check the naive Buffer comparison required.
+  const ah = crypto.createHash("sha256").update(String(a)).digest();
+  const bh = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(ah, bh);
 }
 
 // Gate for /api/* — requires a shared access token supplied by the client as
@@ -186,7 +193,27 @@ async function proxyToProvider(
 }
 
 app.disable("x-powered-by");
-app.use(express.raw({ type: "*/*", limit: "10mb" }));
+
+// Real HTTP security headers on every response. The <meta> CSP in index.html only
+// covers the document; it cannot send frame-ancestors/HSTS and does not apply to
+// /api/* JSON responses. frame-ancestors 'none' prevents clickjacking of the SPA.
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; connect-src 'self'; script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; font-src 'self' data:; " +
+      "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+  );
+  next();
+});
+
+// Only buffer raw request bodies for the provider proxy. Buffering every request
+// (incl. SPA-fallback GETs) at 10mb is needless memory pressure under load.
+app.use("/api", express.raw({ type: "*/*", limit: "10mb" }));
 app.use(enforceRateLimit);
 // Authenticate every keyed provider call. Mounted before the provider routes so
 // it covers /api/anthropic, /api/openai and /api/gemini uniformly.
@@ -213,18 +240,24 @@ app.use("/api/openai", async (req, res) => {
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
 
+  // Pin to the chat-completions endpoint. Do NOT forward arbitrary client paths
+  // to api.openai.com: with only the shared access token, a caller could otherwise
+  // spend the operator's key on fine-tuning, file uploads, assistants or pricier
+  // models — broken access control / denial-of-wallet. The Anthropic and Gemini
+  // routes are likewise locked to a single upstream path.
+  //
   // Use clean minimal headers — forwarding browser headers triggers HTTP 421
   // (Misdirected Request) on OpenAI's CDN due to HTTP/2 connection coalescing.
-  // Strip the /api/openai prefix to get the real upstream path.
-  const upstreamPath = req.path.replace(/^\/api\/openai/, "") || "/";
   try {
-    const upstreamRes = await fetch(`https://api.openai.com${upstreamPath}`, {
+    const upstreamRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: req.method,
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${key}`,
       },
-      body: req.body,
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      // Never follow redirects with the operator key attached.
+      redirect: "manual",
     });
     copyResponseHeaders(upstreamRes.headers, res);
     const payload = Buffer.from(await upstreamRes.arrayBuffer());
@@ -236,8 +269,15 @@ app.use("/api/openai", async (req, res) => {
 });
 
 app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req, res) => {
-  const key = requireEnv(res, "GEMINI_API_KEY");
-  if (!key) return;
+  // Accept either name, matching .env.example and the Vite dev proxy
+  // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
+  const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) {
+    res.status(500).json({
+      error: "GOOGLE_API_KEY (or GEMINI_API_KEY) is not configured in the runtime environment.",
+    });
+    return;
+  }
 
   await proxyToProvider(
     req,
