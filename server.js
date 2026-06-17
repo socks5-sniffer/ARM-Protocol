@@ -57,7 +57,16 @@ function filterRequestHeaders(headers) {
 }
 
 function copyResponseHeaders(upstreamHeaders, res) {
-  const blocked = new Set(["content-encoding", "transfer-encoding", "connection"]);
+  // Drop hop-by-hop / encoding headers. content-length is dropped because Node's
+  // fetch transparently decompresses gzip/br bodies while leaving the original
+  // (compressed) content-length on the headers; forwarding it would mismatch the
+  // re-sent buffer and truncate/hang the client. Express sets it from the payload.
+  const blocked = new Set([
+    "content-encoding",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+  ]);
 
   for (const [key, value] of upstreamHeaders.entries()) {
     if (!blocked.has(key.toLowerCase())) {
