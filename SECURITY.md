@@ -14,8 +14,9 @@ API calls to three LLM providers are made at runtime — Anthropic (Claude), Ope
 The Vite dev server includes a proxy layer (`vite.config.js`) that injects the keys
 **server-side** and routes `/api/anthropic`, `/api/openai` and `/api/gemini` through the
 local dev server, keeping API keys out of the browser entirely. Keys are loaded from `.env`
-using **plain, non-`VITE_`-prefixed** names (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`GOOGLE_API_KEY`; for production `server.js`, set `GEMINI_API_KEY`) — see `.env.example`.
+using **plain, non-`VITE_`-prefixed** names (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and
+`GOOGLE_API_KEY` or `GEMINI_API_KEY` for Gemini — both the Vite dev proxy and production
+`server.js` accept either name) — see `.env.example`.
 
 - **NEVER commit your `.env` file or hardcode any API key into source code.** Keys must stay
   in `.env`, which is excluded by `.gitignore`.
