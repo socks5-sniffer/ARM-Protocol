@@ -15,7 +15,7 @@ The Vite dev server includes a proxy layer (`vite.config.js`) that injects the k
 **server-side** and routes `/api/anthropic`, `/api/openai` and `/api/gemini` through the
 local dev server, keeping API keys out of the browser entirely. Keys are loaded from `.env`
 using **plain, non-`VITE_`-prefixed** names (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`GOOGLE_API_KEY` / `GEMINI_API_KEY`) — see `.env.example`.
+`GOOGLE_API_KEY`; for production `server.js`, set `GEMINI_API_KEY`) — see `.env.example`.
 
 - **NEVER commit your `.env` file or hardcode any API key into source code.** Keys must stay
   in `.env`, which is excluded by `.gitignore`.
