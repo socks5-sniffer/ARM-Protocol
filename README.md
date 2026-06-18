@@ -340,9 +340,8 @@ oc get route arm-protocol
 
 ARM's mechanisms align with active AI safety research:
 
-- **LACE (arXiv:2604.15529)** — Layered Accountability and Causal Explanation in multi-agent systems
-- **Persuasion Duality (arXiv:2509.21054)** — Tension between persuasion and epistemic integrity in AI communication
-- **STAR-XAI (arXiv:2509.17978)** — Structured Transparency for Agent Reasoning in explainable AI
+- **Persuasion Duality (arXiv:2509.21054)** — *Disagreements in Reasoning: How a Model's Thinking Process Dictates Persuasion in Multi-Agent Systems.* Coins the "Persuasion Duality": sharing reasoning makes an agent both more auditable and more persuasive.
+- **STAR-XAI (arXiv:2509.17978)** — *The STAR-XAI Protocol: A Framework for Inducing and Verifying Agency, Reasoning, and Reliability in AI Agents.* Structured, verifiable agent reasoning for explainability.
 
 ARM's contribution is a **working protocol** that measures the specific mechanisms by which multi-agent deliberation either improves or degrades reasoning quality — through reproducible quantitative signals rather than qualitative assessment.
 
