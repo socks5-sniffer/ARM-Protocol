@@ -11,10 +11,21 @@ Currently, the `main` branch of ARM is the only supported version for security u
 API calls to three LLM providers are made at runtime — Anthropic (Claude), OpenAI (GPT-4o-mini), and Google (Gemini 2.5 Flash).
 
 **Dev environment (local only):**
-The Vite dev server includes a proxy layer (`vite.config.js`) that routes `/api/anthropic` and `/gemini` through the local server, keeping API keys out of the browser network tab during development. Keys are loaded from `.env` via `VITE_*` environment variables.
+The Vite dev server includes a proxy layer (`vite.config.js`) that injects the keys
+**server-side** and routes `/api/anthropic`, `/api/openai` and `/api/gemini` through the
+local dev server, keeping API keys out of the browser entirely. Keys are loaded from `.env`
+using **plain, non-`VITE_`-prefixed** names (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and
+`GOOGLE_API_KEY` or `GEMINI_API_KEY` for Gemini — both the Vite dev proxy and production
+`server.js` accept either name) — see `.env.example`.
 
-- **NEVER commit your `.env` file or hardcode any API key into source code.** All three keys (`VITE_ANTHROPIC_API_KEY`, `VITE_OPENAI_API_KEY`, `VITE_GEMINI_API_KEY`) must stay in `.env` which is excluded by `.gitignore`.
-- **Production / public hosting warning:** The Vite proxy is a dev-only tool. If you build and deploy to a public host (Vercel, Netlify, GitHub Pages, etc.), API keys injected as `VITE_*` variables will be visible in the compiled bundle. **Do not deploy publicly without first moving all API calls to a secure backend proxy** (e.g., an Express.js server, Next.js API routes, or serverless functions).
+- **NEVER commit your `.env` file or hardcode any API key into source code.** Keys must stay
+  in `.env`, which is excluded by `.gitignore`.
+- **Do NOT use `VITE_`-prefixed names for provider keys.** Anything `VITE_`-prefixed is inlined
+  into the compiled browser bundle by Vite and would leak the key to every visitor. Use the
+  plain names above so the keys stay server-side.
+- **Production / public hosting:** Deploy via the server-side proxy (`server.js` / Containerfile,
+  see below), which holds the keys in the runtime environment and never ships them to the browser.
+  Do **not** deploy a static build that relies on `VITE_*` keys to a public host.
 - Set strict spend limits and usage caps in each provider's dashboard while developing locally (Anthropic, OpenAI, and Google AI Studio all support this).
 
 ## 🚪 Production Proxy (`server.js`)

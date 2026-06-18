@@ -31,7 +31,10 @@ const PROVIDER_MODEL = {
   gemini: "gemini-2.5-pro",
 };
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Provider API keys live ONLY server-side (server.js proxy / vite dev proxy).
+// Never read a VITE_*_API_KEY here: anything VITE_-prefixed is inlined into the
+// browser bundle, which would leak the key to every visitor. The server returns a
+// clear 500 if a key is missing, so no client-side presence check is needed.
 const TOKENS_R1 = Number(import.meta.env.VITE_TOKENS_R1 || 5000);
 const TOKENS_R2 = Number(import.meta.env.VITE_TOKENS_R2 || 6500);
 const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 12000); // Updated from 8000
@@ -1020,16 +1023,8 @@ export default function ARM() {
       gamma: gammaProvider,
     };
     const silentProvider = providers[silentAgent];
-
-    const missingKeys = [];
-    if ([providers.alpha, providers.beta, providers.gamma, silentProvider].includes("gemini") && !GEMINI_API_KEY) {
-      missingKeys.push("VITE_GEMINI_API_KEY");
-    }
-    if (missingKeys.length > 0) {
-      setStatus("idle");
-      addLog(`Missing keys: ${[...new Set(missingKeys)].join(", ")}`);
-      return;
-    }
+    // Provider keys are validated server-side; a missing key surfaces as an API
+    // error on the first call rather than a client-side pre-flight check.
 
     addLog(`ARM v0.8 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
