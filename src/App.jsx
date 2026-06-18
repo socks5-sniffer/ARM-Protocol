@@ -527,6 +527,7 @@ function sanitizeText(value, maxLen = 8000) {
   if (typeof value !== "string") return value;
   let s = value
     .replace(/<\/?arm:[a-z_]*>/gi, "")                          // neutralize delimiter forgery
+    // eslint-disable-next-line no-control-regex -- intentional: strips control chars from untrusted input
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ""); // strip control chars (keep \t, \n)
   if (s.length > maxLen) s = s.slice(0, maxLen) + "…[truncated]";
   return s;
