@@ -49,10 +49,14 @@ import { C, f } from "./theme.js";
 import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
 import { exportJSON, EXPORT_SCHEMA_VERSION } from "./lib/exportTrace.js";
+import { buildFilename, saveTrace } from "./autoSave.js";
+
+const ARM_VERSION = "0.8";
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ARM() {
   const [question, setQuestion]             = useState(DEFAULT_QUESTION);
+  const [questionId, setQuestionId]         = useState("200");
   const [roleInjection, setRoleInjection]   = useState(true);
   const [silentAgent, setSilentAgent]       = useState("gamma"); // rotating baseline
   const [alphaFrame, setAlphaFrame]         = useState("deontological");
@@ -434,6 +438,41 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
     });
+    // Auto-save trace to /trace on the server
+    const autoSaveFilename = buildFilename({
+      version: ARM_VERSION,
+      questionId,
+      providers,
+      roleInjection,
+      silentAgent,
+      status: "done",
+    });
+    const autoSavePayload = {
+      schema_version: EXPORT_SCHEMA_VERSION,
+      r1: { alpha: pA1.trace, beta: pB1.trace, gamma: pG1.trace, silent: pSilent.trace },
+      r2: { alpha: pA2.trace, beta: pB2.trace, gamma: pG2.trace },
+      convergence: conv,
+      runMeta: {
+        schema_version: EXPORT_SCHEMA_VERSION,
+        duration: elapsed,
+        roleInjection,
+        silentAgent,
+        frames,
+        providers,
+        silentConfidence: pSilent.trace.confidence,
+        fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
+        fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
+        polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
+        gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
+        disagreement: pG2.trace.disagreement_classification,
+        convergence: conv,
+      },
+      question,
+      providers,
+    };
+    const saved = await saveTrace(autoSavePayload, autoSaveFilename, accessToken);
+    addLog(saved ? `Auto-saved: ${autoSaveFilename}` : `Auto-save failed (server unreachable?) — use Export to save manually`);
+
     setStatus("done");
     addLog(`Run complete in ${elapsed}s`);
     } catch (err) {
@@ -476,12 +515,24 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       </div>
 
       {/* Question */}
-      <textarea
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        disabled={isRunning}
-        style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box", marginBottom: "1rem" }}
-      />
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", marginBottom: "1rem" }}>
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          disabled={isRunning}
+          style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box" }}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <label style={{ fontSize: "0.6rem", color: C.muted, whiteSpace: "nowrap" }}>question id</label>
+          <input
+            type="text"
+            value={questionId}
+            onChange={(e) => setQuestionId(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
+            disabled={isRunning}
+            style={{ width: "60px", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.4rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, textAlign: "center" }}
+          />
+        </div>
+      </div>
 
       {/* Controls */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>

@@ -268,7 +268,7 @@ app.use("/api/openai", async (req, res) => {
   }
 });
 
-app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req, res) => {
+app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, res) => {
   // Accept either name, matching .env.example and the Vite dev proxy
   // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
   const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -283,7 +283,7 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req
     req,
     res,
     "https://generativelanguage.googleapis.com",
-    "/v1beta/models/gemini-2.5-flash:generateContent",
+    "/v1beta/models/gemini-2.5-pro:generateContent",
     {
       "x-goog-api-key": key,
     }

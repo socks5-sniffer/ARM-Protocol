@@ -9,8 +9,8 @@ const ANTHROPIC_MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || "claude-sonnet-4
 
 export const PROVIDER_MODEL = {
   claude: ANTHROPIC_MODEL,
-  gpt: "gpt-4o-mini",
-  gemini: "gemini-2.5-flash",
+  gpt: "gpt-4o",
+  gemini: "gemini-2.5-pro",
 };
 
 // Provider API keys live ONLY server-side (server.js proxy / vite dev proxy).
