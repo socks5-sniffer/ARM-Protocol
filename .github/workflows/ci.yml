@@ -1,10 +1,9 @@
-name: CI Pipeline
+name: CI
 
 on:
   push:
     branches:
       - main
-      - CI-integration
   pull_request:
     branches:
       - main
@@ -14,13 +13,48 @@ permissions:
 
 jobs:
   build:
+    name: Build (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['20.x', '22.x']
+      fail-fast: false
 
-    # Actions are SHA-pinned to the same commits used by the repo's security
-    # scan workflow (github_workflows_ci.yml) for consistency. These are newer
-    # majors than the previous mutable @v4 tags (checkout v6, setup-node v6,
-    # upload-artifact v7); the build only does npm ci + build + artifact upload,
-    # which is unaffected by the major bumps.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload build artifacts
+        if: matrix.node-version == '22.x'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: build
+
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -34,11 +68,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
+      - name: Generate SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output-format JSON --output-file sbom.json
 
-      - name: Upload build artifacts
+      - name: Upload SBOM
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: build-artifacts
-          path: dist/
+          name: sbom-report
+          path: sbom.json
+          retention-days: 30
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    # Runs on pull requests only, and only once the repo is public — the action
+    # requires the Dependency Graph feature, which GitHub enables automatically
+    # for public repos. While private, the job is skipped (skipped ≠ failed, so it
+    # neither blocks the PR nor fires a failing check). continue-on-error is kept
+    # as a backstop so a transient action error never blocks the merge.
+    if: github.event_name == 'pull_request' && github.event.repository.private == false
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: always

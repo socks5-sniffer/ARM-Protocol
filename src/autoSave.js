@@ -28,8 +28,11 @@ export async function saveTrace(data, filename, accessToken) {
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       console.warn("[ARM] auto-save failed:", err.error || resp.status);
+      return false;
     }
+    return true;
   } catch (err) {
     console.warn("[ARM] auto-save error:", err instanceof Error ? err.message : String(err));
+    return false;
   }
 }
