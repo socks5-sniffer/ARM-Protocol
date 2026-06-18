@@ -1,19 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// ─── ARM v0.8 ───────────────────────────────────────────────────────────────────
-// Upgrades from v0.5 (Run 15):
-//   1. ASYMMETRIC DRIFT THRESHOLDS (Gemini rec #1)
-//      - Memetic drift flag: Δ > +0.04 (tightened from 0.05)
-//      - Epistemic tightening floor: Δ < -0.15 triggers "deep tightening" note
-//      - Rationale: tightening is healthy; only upward drift is the threat
-//   2. ROTATING SILENT BASELINE (Gemini rec #4)
-//      - User selects which agent runs silent: Alpha | Beta | Gamma
-//      - Validates that 0.720 reproducibility is protocol property, not Gamma artifact
-//   3. DECISION_BASIS FIELD (GPT rec)
-//      - All agents explicitly declare: utilitarian | deontological | hybrid | uncertain
-//      - Enables direct validation of disagreement_classification rather than inference
-//   4. RLHF BIAS AUDIT in Gamma R2 (Gemini rec #5)
-//      - Gamma explicitly asks: "Are we agreeing because logic is sound or shared RLHF penalization?"
-//   5. Retains: role injection toggle, export JSON, Gamma self-Δ vs silent baseline
 import { useState } from "react";
 
 import {
