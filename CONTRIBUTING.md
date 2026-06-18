@@ -8,10 +8,10 @@ This protocol started as an independent research project into AI safety, the "Pe
 
 If you're looking for ways to contribute, here are our current research and development priorities:
 
-1. **Adversarial Prompt/Question Design:** Submit PRs to expand the `PRESETS` question bank. We need deeply ambiguous questions specifically designed to force agents into irreconcilable `values` conflicts — questions where `disagreement_classification: values` is the expected output, not a surprise finding.
+1. **Adversarial Prompt/Question Design:** Submit PRs to expand the question bank in `questions.json`. We need deeply ambiguous questions specifically designed to force agents into irreconcilable `values` conflicts — questions where `disagreement_classification: values` is the expected output, not a surprise finding.
 2. **The "Zulu" Auditing Layer:** We need help implementing the Zulu layer — a system for cross-session temporal drift auditing and persistent memory storage (e.g., Firebase/Firestore, SQLite, or a flat-file trace store). This would allow the protocol to detect whether Gamma's reconciliation stance is drifting systematically over time across separate sessions.
 3. **Embedding-Based Convergence Metric:** Replace the current lexical Jaccard similarity metric with an embedding-based alternative (e.g., cosine similarity of sentence embeddings). Jaccard is insensitive to semantic convergence expressed in different vocabulary — two agents can share the same conclusion in different words and score as divergent.
-4. **Secure Backend Proxy:** The current Vite dev proxy is development-only. A production-ready backend proxy (Express.js, Next.js API routes, or similar) would allow safe public deployment without exposing API keys.
+4. **Production Proxy Hardening:** A keyed production proxy already exists (`server.js`, Express) — it serves `/api/*` with access-token auth and rate limiting, and the Vite dev proxy covers local development. Help is welcome hardening it further: per-provider rate limits, request logging/observability, and deployment docs for platforms beyond the included OpenShift manifests.
 5. **UI/UX Improvements:** Enhancements to the React frontend to better visualize the reasoning mesh and drift telemetry across cross-model runs.
 
 > **Already implemented (not needed):** Cross-model provider support for Claude, GPT-4o, and Gemini 2.5 Pro is fully live. Per-agent provider selection is available in the UI. (GPT-4o and Gemini 2.5 Pro are the v0.8 agents; runs through v0.7.1 used GPT-4o-mini and Gemini 2.5 Flash.)
@@ -34,7 +34,7 @@ We are committed to providing a welcoming and inspiring community for all.
 
 ## 🧪 Research Methodology Note
 
-If your PR includes changes to the core prompt architecture (`buildAlphaR1`, `buildBetaR1`, `buildGammaR1`, `buildAlphaR2`, `buildBetaR2`, `SYSTEM_GAMMA_R2` in `src/App.jsx`), please include data from a few test runs in your Pull Request description. ARM is an empirical research tool, and prompt changes should ideally be backed by observable shifts in drift scores or convergence metrics.
+If your PR includes changes to the core prompt architecture (`buildAlphaR1`, `buildBetaR1`, `buildAlphaR2`, `buildBetaR2`, and `SYSTEM_GAMMA_R2` in `src/prompts.js`, or the inline Gamma R1 prompt dispatched from `src/App.jsx`), please include data from a few test runs in your Pull Request description. ARM is an empirical research tool, and prompt changes should ideally be backed by observable shifts in drift scores or convergence metrics.
 
 ---
 
