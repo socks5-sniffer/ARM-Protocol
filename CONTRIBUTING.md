@@ -14,7 +14,7 @@ If you're looking for ways to contribute, here are our current research and deve
 4. **Secure Backend Proxy:** The current Vite dev proxy is development-only. A production-ready backend proxy (Express.js, Next.js API routes, or similar) would allow safe public deployment without exposing API keys.
 5. **UI/UX Improvements:** Enhancements to the React frontend to better visualize the reasoning mesh and drift telemetry across cross-model runs.
 
-> **Already implemented (not needed):** Cross-model provider support for Claude, GPT-4o-mini, and Gemini 2.5 Flash is fully live in `src/App.jsx`. Per-agent provider selection is available in the UI.
+> **Already implemented (not needed):** Cross-model provider support for Claude, GPT-4o, and Gemini 2.5 Pro is fully live. Per-agent provider selection is available in the UI. (GPT-4o and Gemini 2.5 Pro are the v0.8 agents; runs through v0.7.1 used GPT-4o-mini and Gemini 2.5 Flash.)
 
 ## 🛠️ How to Contribute
 

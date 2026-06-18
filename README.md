@@ -131,6 +131,8 @@ Every exported run is sealed with a SHA-256 `export_integrity_hash` computed ove
 
 Findings from 30+ runs across v0.3–v0.7.1 (documented in `/trace`):
 
+> **Model note (recent):** v0.8 moved the cross-model agents to **GPT-4o** and **Gemini 2.5 Pro**. All findings below — and every run through v0.7.1 — were produced on the earlier **GPT-4o-mini** and **Gemini 2.5 Flash** agents (the Claude agent has remained `claude-sonnet-4-*` throughout). Absolute numbers may shift when these questions are re-run on the v0.8 models; the trace files in `/trace` record the exact model used for each run.
+
 ### Epistemic Tightening is the Dominant Pattern
 
 Across all clean runs (agents successfully parsed, no rate-limit failures):
@@ -257,8 +259,8 @@ Gamma R2 adds:
 ### Prerequisites
 - Node.js
 - An Anthropic API key (Claude) — required
-- An OpenAI API key (GPT-4o-mini) — optional, for cross-model runs
-- A Google Gemini API key (Gemini 2.5 Flash) — optional, for cross-model runs
+- An OpenAI API key (GPT-4o) — optional, for cross-model runs
+- A Google Gemini API key (Gemini 2.5 Pro) — optional, for cross-model runs
 
 ### Installation
 
@@ -349,7 +351,7 @@ ARM's contribution is a **working protocol** that measures the specific mechanis
 
 ## 🗺️ Roadmap
 
-- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o-mini / Gemini 2.5 Flash) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
+- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o / Gemini 2.5 Pro) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
 - **Adversarial question design** — Expanding the test battery to questions with genuinely irreconcilable positions
 - **Zulu layer** — Cross-session temporal drift auditing (comparing the same question's outputs across separate sessions over time)
 - **Phase 3 Re-Queue loop** — Automated correction flag written back into trace store when drift exceeds threshold
