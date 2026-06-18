@@ -945,9 +945,12 @@ async function saveTrace(data, filename, accessToken) {
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       console.warn("[ARM] auto-save failed:", err.error || resp.status);
+      return false;
     }
+    return true;
   } catch (err) {
     console.warn("[ARM] auto-save error:", err.message);
+    return false;
   }
 }
 
@@ -1384,8 +1387,8 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       question,
       providers,
     };
-    await saveTrace(autoSavePayload, autoSaveFilename, accessToken);
-    addLog(`Auto-saved: ${autoSaveFilename}`);
+    const saved = await saveTrace(autoSavePayload, autoSaveFilename, accessToken);
+    addLog(saved ? `Auto-saved: ${autoSaveFilename}` : `Auto-save failed (server unreachable?) — use Export to save manually`);
 
     setStatus("done");
     addLog(`Run complete in ${elapsed}s`);
