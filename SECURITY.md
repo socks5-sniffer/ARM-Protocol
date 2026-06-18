@@ -8,7 +8,7 @@ Currently, the `main` branch of ARM is the only supported version for security u
 
 **ARM is a client-side React research prototype (Vite + React 18).**
 
-API calls to three LLM providers are made at runtime — Anthropic (Claude), OpenAI (GPT-4o-mini), and Google (Gemini 2.5 Flash).
+API calls to three LLM providers are made at runtime — Anthropic (Claude), OpenAI (GPT-4o), and Google (Gemini 2.5 Pro).
 
 **Dev environment (local only):**
 The Vite dev server includes a proxy layer (`vite.config.js`) that injects the keys

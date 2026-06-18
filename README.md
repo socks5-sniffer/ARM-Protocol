@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
 
-> **Current version:** `v0.8` · `src/App.jsx` · Model: `claude-sonnet-4-6`
+> **Current version:** `v0.8` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-4o` · `gemini-2.5-pro` (any agent slot can be assigned to any provider)
 
 -----
 
@@ -129,7 +129,9 @@ Every exported run is sealed with a SHA-256 `export_integrity_hash` computed ove
 
 ## 📊 Key Empirical Findings
 
-Findings from 30+ runs across v0.3–v0.7.1 (documented in `/trace`):
+Findings from ~100 runs across the full research arc (v0.3–v0.8); a representative subset is documented in `/trace`:
+
+> **Model note (recent):** v0.8 moved the cross-model agents to **GPT-4o** and **Gemini 2.5 Pro**. All findings below — and every run through v0.7.1 — were produced on the earlier **GPT-4o-mini** and **Gemini 2.5 Flash** agents (the Claude agent has remained `claude-sonnet-4-*` throughout). Absolute numbers may shift when these questions are re-run on the v0.8 models; the trace files in `/trace` record the exact model used for each run.
 
 ### Epistemic Tightening is the Dominant Pattern
 
@@ -257,8 +259,8 @@ Gamma R2 adds:
 ### Prerequisites
 - Node.js
 - An Anthropic API key (Claude) — required
-- An OpenAI API key (GPT-4o-mini) — optional, for cross-model runs
-- A Google Gemini API key (Gemini 2.5 Flash) — optional, for cross-model runs
+- An OpenAI API key (GPT-4o) — optional, for cross-model runs
+- A Google Gemini API key (Gemini 2.5 Pro) — optional, for cross-model runs
 
 ### Installation
 
@@ -285,13 +287,13 @@ Start the development server:
 npm run dev
 ```
 
-### Token Budget (v0.7.1 defaults)
+### Token Budget (current defaults)
 
 | Stage | Budget | Rationale |
 |---|---|---|
 | R1 (all agents) | 5000t | Matched budgets for experimental consistency |
 | R2 Alpha/Beta | 6500t | Full deliberation with drift note |
-| Gamma R2 | 8000t | Reconciliation + RLHF audit requires largest context |
+| Gamma R2 | 12000t | Reconciliation + RLHF audit requires largest context (raised from 8000t to prevent truncation) |
 
 All token budgets are configurable via environment variables (`VITE_TOKENS_R1`, `VITE_TOKENS_R2`, `VITE_TOKENS_GAMMA`).
 
@@ -340,9 +342,8 @@ oc get route arm-protocol
 
 ARM's mechanisms align with active AI safety research:
 
-- **LACE (arXiv:2604.15529)** — Layered Accountability and Causal Explanation in multi-agent systems
-- **Persuasion Duality (arXiv:2509.21054)** — Tension between persuasion and epistemic integrity in AI communication
-- **STAR-XAI (arXiv:2509.17978)** — Structured Transparency for Agent Reasoning in explainable AI
+- **Persuasion Duality (arXiv:2509.21054)** — *Disagreements in Reasoning: How a Model's Thinking Process Dictates Persuasion in Multi-Agent Systems.* Coins the "Persuasion Duality": sharing reasoning makes an agent both more auditable and more persuasive.
+- **STAR-XAI (arXiv:2509.17978)** — *The STAR-XAI Protocol: A Framework for Inducing and Verifying Agency, Reasoning, and Reliability in AI Agents.* Structured, verifiable agent reasoning for explainability.
 
 ARM's contribution is a **working protocol** that measures the specific mechanisms by which multi-agent deliberation either improves or degrades reasoning quality — through reproducible quantitative signals rather than qualitative assessment.
 
@@ -350,7 +351,7 @@ ARM's contribution is a **working protocol** that measures the specific mechanis
 
 ## 🗺️ Roadmap
 
-- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o-mini / Gemini 2.5 Flash) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
+- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o / Gemini 2.5 Pro) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
 - **Adversarial question design** — Expanding the test battery to questions with genuinely irreconcilable positions
 - **Zulu layer** — Cross-session temporal drift auditing (comparing the same question's outputs across separate sessions over time)
 - **Phase 3 Re-Queue loop** — Automated correction flag written back into trace store when drift exceeds threshold
@@ -382,18 +383,30 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 ```
 /
 ├── .env.example               # Environment variable template
+├── .github/workflows/         # CI + OWASP security scan workflows
 ├── CONTRIBUTING.md
-├── LICENSE
+├── LICENSE  ·  NOTICE
 ├── README.md
 ├── SECURITY.md
+├── Containerfile              # Container image build
+├── devfile.yaml               # Dev environment definition
 ├── index.html                 # Vite entry point
 ├── package.json
-├── vite.config.js
+├── vite.config.js             # Dev server + provider proxy routes
+├── server.js                  # Production Express proxy (keyed /api/*)
+├── questions.json             # Question bank / presets
+├── openshift/                 # OpenShift deployment manifests
+├── gamma/                     # Gamma reliability test harness + data
 ├── src/                       # React app source
-│   ├── App.jsx                # Current protocol — v0.8
-│   └── main.jsx
-└── trace/                     # Exported run telemetry (JSON)
-  └── arm-v08-run-*.json
+│   ├── App.jsx                # Protocol orchestrator — v0.8
+│   ├── api.js                 # Provider transport (Claude / GPT / Gemini)
+│   ├── config.js              # Models, token budgets, thresholds
+│   ├── prompts.js             # Agent prompt builders
+│   ├── main.jsx
+│   ├── components/            # UI cards & section labels
+│   ├── lib/                   # analysis, trace, sanitize, export helpers
+│   └── test/                  # Vitest suite
+└── trace/                     # Exported run telemetry (v0.6–v0.7.1 JSON + run write-ups)
 ```
 
 > **Note:** `versions/` (archived protocol files), `data/` (research documents), and `delta_drift.py` (drift utilities) exist locally and are intentionally excluded from the public repository via `.gitignore`.
@@ -407,4 +420,4 @@ This project is licensed under the Apache License, Version 2.0 — see `LICENSE`
 ---
 
 *ARM v0.8 · Protocol designed and tested by a self-taught developer with 5 months of coding experience.*  
-*16 experimental runs · Model: claude-sonnet-4-20250514 · Research ongoing.*
+*~100 experimental runs across the research arc · Models: claude-sonnet-4-6 / gpt-4o / gemini-2.5-pro · Research ongoing.*
