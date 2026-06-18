@@ -419,5 +419,5 @@ This project is licensed under the Apache License, Version 2.0 — see `LICENSE`
 
 ---
 
-*ARM v0.8 · Protocol designed and tested by a self-taught developer with 5 months of coding experience.*  
+*ARM v0.8 · Protocol designed and tested by a self-taught developer.*  
 *~100 experimental runs across the research arc · Models: claude-sonnet-4-6 / gpt-4o / gemini-2.5-pro · Research ongoing.*
