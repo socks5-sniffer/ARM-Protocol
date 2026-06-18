@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "dotenv/config";
 import express from "express";
 import fs from "fs";
 import path from "path";
@@ -268,7 +269,7 @@ app.use("/api/openai", async (req, res) => {
   }
 });
 
-app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req, res) => {
+app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, res) => {
   // Accept either name, matching .env.example and the Vite dev proxy
   // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
   const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -283,11 +284,43 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-flash:generateContent", async (req
     req,
     res,
     "https://generativelanguage.googleapis.com",
-    "/v1beta/models/gemini-2.5-flash:generateContent",
+    "/v1beta/models/gemini-2.5-pro:generateContent",
     {
       "x-goog-api-key": key,
     }
   );
+});
+
+// ─── Auto-save trace endpoint ──────────────────────────────────────────────────
+const traceDir = path.join(__dirname, "trace");
+if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
+
+app.post("/api/save-trace", enforceRateLimit, express.json({ limit: "2mb" }), (req, res) => {
+  const key = req.headers["x-arm-token"];
+  if (ACCESS_TOKEN && key !== ACCESS_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { filename, trace } = req.body || {};
+  if (!filename || !trace || typeof trace !== "object") {
+    return res.status(400).json({ error: "Missing filename or trace" });
+  }
+
+  // Sanitize filename — alphanumeric, hyphens, underscores, dots only
+  const safe = path.basename(filename).replace(/[^a-zA-Z0-9\-_.]/g, "_");
+  if (!safe.endsWith(".json")) {
+    return res.status(400).json({ error: "filename must end in .json" });
+  }
+
+  const dest = path.join(traceDir, safe);
+  try {
+    fs.writeFileSync(dest, JSON.stringify(trace, null, 2), "utf8");
+    console.log(`[ARM] trace saved → trace/${safe}`);
+    res.json({ ok: true, saved: `trace/${safe}` });
+  } catch (err) {
+    console.error(`[ARM] trace save failed: ${err.message}`);
+    res.status(500).json({ error: "Failed to write trace file" });
+  }
 });
 
 app.use(express.static(distDir));
