@@ -59,14 +59,17 @@ async function callGPT(systemPrompt, userMessage, maxTokens) {
       ...authHeaders(),
     },
 
+    // GPT-5 family requires max_completion_tokens (max_tokens is deprecated/rejected)
+    // and does not accept temperature on the reasoning path. We omit temperature so
+    // the same call works across Instant and any Thinking-tier model swapped in later;
+    // sampling defaults apply. Re-add temperature only if the chosen model accepts it.
     body: JSON.stringify({
       model: PROVIDER_MODEL.gpt,
-      max_tokens: maxTokens,
+      max_completion_tokens: maxTokens,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
-      temperature: 0.7,
     }),
   });
 

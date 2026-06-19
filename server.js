@@ -294,7 +294,16 @@ app.use("/api/openai", async (req, res) => {
   }
 });
 
-app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, res) => {
+// Allowlisted Gemini models. The route is parameterised so the configured model
+// can change without code edits, but the upstream path is reconstructed from a
+// VALIDATED model id — never forwarded raw — preserving the broken-access-control
+// protection (no arbitrary path/model can be proxied on the operator key).
+const ALLOWED_GEMINI_MODELS = new Set([
+  "gemini-3.5-flash",
+  "gemini-2.5-pro", // retained for back-compat with older trace reruns
+]);
+
+app.use("/api/gemini", async (req, res) => {
   // Accept either name, matching .env.example and the Vite dev proxy
   // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
   const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -305,11 +314,19 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, 
     return;
   }
 
+  // req.path is relative to the /api/gemini mount, e.g.
+  //   /v1beta/models/gemini-3.5-flash:generateContent
+  const match = req.path.match(/^\/v1beta\/models\/([A-Za-z0-9.\-]+):generateContent$/);
+  if (!match || !ALLOWED_GEMINI_MODELS.has(match[1])) {
+    res.status(400).json({ error: "Unsupported or invalid Gemini model path." });
+    return;
+  }
+
   await proxyToProvider(
     req,
     res,
     "https://generativelanguage.googleapis.com",
-    "/v1beta/models/gemini-2.5-pro:generateContent",
+    `/v1beta/models/${match[1]}:generateContent`,
     {
       "x-goog-api-key": key,
     }

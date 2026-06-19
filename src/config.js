@@ -7,10 +7,16 @@ export const PROVIDER_LABEL = {
 
 const ANTHROPIC_MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
+// Matched mid/fast tier panel (June 2026): each provider's fast default tier.
+// GPT-4o and the o-series were retired Feb 2026; Gemini 2.5 Pro superseded by 3.x.
+//   claude  → Sonnet 4.6        (Anthropic fast/mid tier)
+//   gpt     → GPT-5.5 Instant   (OpenAI non-reasoning default; replaces retired gpt-4o)
+//   gemini  → Gemini 3.5 Flash  (Google fast tier; replaces gemini-2.5-pro)
+// Server-side Gemini proxy allowlists these ids — see ALLOWED_GEMINI_MODELS in server.js.
 export const PROVIDER_MODEL = {
   claude: ANTHROPIC_MODEL,
-  gpt: "gpt-4o",
-  gemini: "gemini-2.5-pro",
+  gpt: "gpt-5.5-instant",
+  gemini: "gemini-3.5-flash",
 };
 
 // Provider API keys live ONLY server-side (server.js proxy / vite dev proxy).

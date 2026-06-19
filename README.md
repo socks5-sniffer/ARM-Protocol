@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
 
-> **Current version:** `v0.8` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-4o` · `gemini-2.5-pro` (any agent slot can be assigned to any provider)
+> **Current version:** `v0.8` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-5.5-instant` · `gemini-3.5-flash` (any agent slot can be assigned to any provider)
 
 -----
 
@@ -131,7 +131,7 @@ Every exported run is sealed with a SHA-256 `export_integrity_hash` computed ove
 
 Findings from ~100 runs across the full research arc (v0.3–v0.8); a representative subset is documented in `/trace`:
 
-> **Model note (recent):** v0.8 moved the cross-model agents to **GPT-4o** and **Gemini 2.5 Pro**. All findings below — and every run through v0.7.1 — were produced on the earlier **GPT-4o-mini** and **Gemini 2.5 Flash** agents (the Claude agent has remained `claude-sonnet-4-*` throughout). Absolute numbers may shift when these questions are re-run on the v0.8 models; the trace files in `/trace` record the exact model used for each run.
+> **Model note (recent):** the cross-model agents now run a **matched mid/fast tier** panel — `claude-sonnet-4-6` · `gpt-5.5-instant` · `gemini-3.5-flash` — each provider's current fast default tier. This replaces the earlier `gpt-4o` / `gemini-2.5-pro` pairing, which mixed a retired non-reasoning OpenAI model with a one-generation-old Gemini and was **not tier-matched**; trace depth from those `gpt-4o` runs was capability-limited rather than provider-characteristic. Findings produced on the older models (including the CFAAq2 cross-provider study) should be treated as **pending re-run** on the matched panel before they are cited as tier-controlled. The trace files in `/trace` record the exact model used for each run.
 
 ### Epistemic Tightening is the Dominant Pattern
 
@@ -259,8 +259,8 @@ Gamma R2 adds:
 ### Prerequisites
 - Node.js
 - An Anthropic API key (Claude) — required
-- An OpenAI API key (GPT-4o) — optional, for cross-model runs
-- A Google Gemini API key (Gemini 2.5 Pro) — optional, for cross-model runs
+- An OpenAI API key (GPT-5.5 Instant) — optional, for cross-model runs
+- A Google Gemini API key (Gemini 3.5 Flash) — optional, for cross-model runs
 
 ### Installation
 
@@ -351,7 +351,7 @@ ARM's contribution is a **working protocol** that measures the specific mechanis
 
 ## 🗺️ Roadmap
 
-- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o / Gemini 2.5 Pro) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
+- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-5.5 Instant / Gemini 3.5 Flash) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
 - **Adversarial question design** — Expanding the test battery to questions with genuinely irreconcilable positions
 - **Zulu layer** — Cross-session temporal drift auditing (comparing the same question's outputs across separate sessions over time)
 - **Phase 3 Re-Queue loop** — Automated correction flag written back into trace store when drift exceeds threshold
@@ -420,4 +420,4 @@ This project is licensed under the Apache License, Version 2.0 — see `LICENSE`
 ---
 
 *ARM v0.8 · Protocol designed and tested by a self-taught developer.*  
-*~100 experimental runs across the research arc · Models: claude-sonnet-4-6 / gpt-4o / gemini-2.5-pro · Research ongoing.*
+*~100 experimental runs across the research arc · Current panel: claude-sonnet-4-6 / gpt-5.5-instant / gemini-3.5-flash (earlier runs used gpt-4o / gemini-2.5-pro) · Research ongoing.*
