@@ -30,7 +30,7 @@ export const PROVIDER_MODEL = {
 // clear 500 if a key is missing, so no client-side presence check is needed.
 export const TOKENS_R1    = Number(import.meta.env.VITE_TOKENS_R1    || 5000);
 export const TOKENS_R2    = Number(import.meta.env.VITE_TOKENS_R2    || 6500);
-export const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 12000); // Updated from 8000
+export const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 8000); // Flash models cap at 8192; 8000 is safe ceiling
 
 // ─── Asymmetric drift config ──────────────────────────────────────────────────
 export const DRIFT_UP_THRESHOLD   =  0.04;  // tightened: memetic drift flag
