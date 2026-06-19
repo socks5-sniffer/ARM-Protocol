@@ -5,6 +5,10 @@ import {
   DELTA_MISMATCH_EPS,
 } from "../config.js";
 
+// Flags that signal values tension — when present alongside a "clean" self_check,
+// the clean is provider house-style, not a genuine epistemic assessment.
+const VALUES_TENSION_FLAGS = new Set(["values_conflict", "contested_domain"]);
+
 // ─── Safe JSON parse ──────────────────────────────────────────────────────────
 export function safeParseTrace(rawResult, agentId) {
   const { raw, stopReason, usage, provider, model, latencyMs } = rawResult;
@@ -52,6 +56,23 @@ export function safeParseTrace(rawResult, agentId) {
 
     const trace = { ...parsed, _meta, _ok: true };
     if (schema_warnings.length) trace.schema_warnings = schema_warnings;
+
+    // Self-check deterministic override: when the agent's own flags contain values-tension
+    // signals, a "clean" self_check is provider house-style, not epistemic state. Override
+    // to "auto_warn" and preserve the original for forensic tracing.
+    if (
+      trace.self_check?.status === "clean" &&
+      Array.isArray(trace.flags) &&
+      trace.flags.some((fl) => VALUES_TENSION_FLAGS.has(fl))
+    ) {
+      trace.self_check = {
+        status: "auto_warn",
+        notes: trace.self_check.notes || "",
+        self_check_overridden: true,
+        self_check_original_status: "clean",
+      };
+    }
+
     return { ok: true, trace, raw };
   } catch (e) {
     const schemaReject = e && e.schemaReject === true;
@@ -100,6 +121,52 @@ export function computeConvergence(traces) {
       const intersection = [...sets[i]].filter((x) => sets[j].has(x)).length;
       const union = new Set([...sets[i], ...sets[j]]).size;
       total += union > 0 ? intersection / union : 0;
+      pairs++;
+    }
+  }
+  return pairs > 0 ? total / pairs : null;
+}
+
+// ─── TF-IDF cosine convergence ────────────────────────────────────────────────
+// IDF down-weights terms shared by all agents (no discriminating signal) toward zero.
+// Threshold is the same as Jaccard (> 0.4 = warn) — lexical domain, same scale.
+export function computeTFIDFCosine(traces) {
+  const claims = traces
+    .filter((t) => t && t._ok !== false && typeof t.claim === "string" && t.claim)
+    .map((t) => t.claim.toLowerCase());
+  if (claims.length < 2) return null;
+
+  const tokenize = (s) => s.split(/\W+/).filter((w) => w.length > 2);
+  const docs = claims.map(tokenize);
+  const N = docs.length;
+
+  const df = new Map();
+  for (const terms of docs) {
+    for (const term of new Set(terms)) df.set(term, (df.get(term) || 0) + 1);
+  }
+
+  const vectors = docs.map((terms) => {
+    const tf = new Map();
+    for (const t of terms) tf.set(t, (tf.get(t) || 0) + 1);
+    const vec = new Map();
+    for (const [term, count] of tf) {
+      vec.set(term, (count / terms.length) * Math.log(N / df.get(term)));
+    }
+    return vec;
+  });
+
+  function cosineSim(a, b) {
+    let dot = 0;
+    for (const [term, val] of a) { if (b.has(term)) dot += val * b.get(term); }
+    const mag = (v) => Math.sqrt([...v.values()].reduce((s, x) => s + x * x, 0));
+    const mA = mag(a), mB = mag(b);
+    return mA && mB ? dot / (mA * mB) : 0;
+  }
+
+  let total = 0, pairs = 0;
+  for (let i = 0; i < vectors.length; i++) {
+    for (let j = i + 1; j < vectors.length; j++) {
+      total += cosineSim(vectors[i], vectors[j]);
       pairs++;
     }
   }

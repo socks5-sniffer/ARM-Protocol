@@ -237,6 +237,31 @@ app.use("/api/anthropic", async (req, res) => {
   );
 });
 
+// Embeddings — pinned to /v1/embeddings (text-embedding-3-small for convergence scoring).
+// Registered before the chat-completions catch-all so it matches first.
+// Same minimal-headers approach: forwarding browser headers triggers HTTP 421 on OpenAI's CDN.
+app.use("/api/openai/v1/embeddings", async (req, res) => {
+  const key = requireEnv(res, "OPENAI_API_KEY");
+  if (!key) return;
+  try {
+    const upstreamRes = await fetch("https://api.openai.com/v1/embeddings", {
+      method: req.method,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`,
+      },
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      redirect: "manual",
+    });
+    copyResponseHeaders(upstreamRes.headers, res);
+    const payload = Buffer.from(await upstreamRes.arrayBuffer());
+    res.status(upstreamRes.status).send(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown proxy error";
+    res.status(502).json({ error: `Proxy request failed: ${message}` });
+  }
+});
+
 app.use("/api/openai", async (req, res) => {
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;

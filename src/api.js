@@ -136,3 +136,39 @@ export function callProvider(provider, systemPrompt, userMessage, maxTokens) {
   if (provider === "gpt")    return callGPT(systemPrompt, userMessage, maxTokens);
   return callGemini(systemPrompt, userMessage, maxTokens);
 }
+
+// ─── Embedding cosine convergence (OpenAI text-embedding-3-small) ─────────────
+// Semantic similarity via dense embeddings. Threshold > 0.85 — topically-related
+// claims score naturally higher than lexical measures, so the bar is set higher.
+// Batches all claims in a single API call (~$0.000002, ~80ms). Fire-and-forget in
+// App.jsx: a missing key or network failure degrades gracefully without aborting the run.
+export async function computeEmbeddingCosine(claims) {
+  if (!Array.isArray(claims) || claims.length < 2) return null;
+  const res = await fetch("/api/openai/v1/embeddings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ model: "text-embedding-3-small", input: claims }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    throw new Error(`Embedding API error: ${data?.error?.message || `HTTP ${res.status}`}`);
+  }
+  const embeddings = data.data
+    .sort((a, b) => a.index - b.index)
+    .map((d) => d.embedding);
+
+  function cosineSim(a, b) {
+    let dot = 0, magA = 0, magB = 0;
+    for (let k = 0; k < a.length; k++) { dot += a[k] * b[k]; magA += a[k] * a[k]; magB += b[k] * b[k]; }
+    return magA && magB ? dot / (Math.sqrt(magA) * Math.sqrt(magB)) : 0;
+  }
+
+  let total = 0, pairs = 0;
+  for (let i = 0; i < embeddings.length; i++) {
+    for (let j = i + 1; j < embeddings.length; j++) {
+      total += cosineSim(embeddings[i], embeddings[j]);
+      pairs++;
+    }
+  }
+  return pairs > 0 ? total / pairs : null;
+}
