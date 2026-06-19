@@ -10,6 +10,7 @@ import {
   DRIFT_UP_THRESHOLD,
   DRIFT_DOWN_THRESHOLD,
   DEFAULT_QUESTION,
+  ARM_VERSION,
 } from "./config.js";
 import {
   buildAlphaR1,
@@ -37,8 +38,6 @@ import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
 import { exportJSON, EXPORT_SCHEMA_VERSION } from "./lib/exportTrace.js";
 import { buildFilename, saveTrace } from "./autoSave.js";
-
-const ARM_VERSION = "0.8";
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ARM() {
@@ -103,7 +102,7 @@ export default function ARM() {
     // Provider keys are validated server-side; a missing key surfaces as an API
     // error on the first call rather than a client-side pre-flight check.
 
-    addLog(`ARM v0.8 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
+    addLog(`ARM v${ARM_VERSION} · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
     addLog(`Question: "${question.slice(0, 80)}..."`);
     addLog("R1 — sequential isolation (zero cross-visibility)");
@@ -464,6 +463,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       status: "done",
     });
     const autoSavePayload = {
+      arm_version: ARM_VERSION,
       schema_version: EXPORT_SCHEMA_VERSION,
       r1: { alpha: pA1.trace, beta: pB1.trace, gamma: pG1.trace, silent: pSilent.trace },
       r2: { alpha: pA2.trace, beta: pB2.trace, gamma: pG2.trace },
@@ -522,7 +522,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           ARM · Agent Reasoning Markup
         </div>
         <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v0.8 · polarity gate · FAP circuit breaker · asymmetric drift · rotating silent baseline · RLHF audit
+          v{ARM_VERSION} · polarity gate · FAP circuit breaker · asymmetric drift · rotating silent baseline · RLHF audit
         </div>
         <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
           Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
@@ -652,7 +652,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         </button>
         {status === "done" && (
           <button
-            onClick={() => exportJSON({ schema_version: EXPORT_SCHEMA_VERSION, r1, r2, convergence, tfidf_convergence: tfidfConvergence, embedding_convergence: embedConvergence, runMeta, question, providers: runMeta?.providers }).catch(err => alert(err.message))}
+            onClick={() => exportJSON({ arm_version: ARM_VERSION, schema_version: EXPORT_SCHEMA_VERSION, r1, r2, convergence, tfidf_convergence: tfidfConvergence, embedding_convergence: embedConvergence, runMeta, question, providers: runMeta?.providers }).catch(err => alert(err.message))}
             style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, padding: "0.55rem 1rem", borderRadius: "3px", cursor: "pointer", fontSize: "0.72rem", fontFamily: f.mono }}
           >
             ↓ export JSON
@@ -724,7 +724,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {status === "done" && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
           <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            Drift Summary · v0.8 Asymmetric Thresholds
+            Drift Summary · v{ARM_VERSION} Asymmetric Thresholds
           </div>
           {driftSummary.map(({ id, delta, label, color, mismatch }) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
@@ -771,7 +771,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v0.8: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
+            v{ARM_VERSION}: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
             Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>
