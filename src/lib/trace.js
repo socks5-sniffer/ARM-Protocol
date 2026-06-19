@@ -57,19 +57,27 @@ export function safeParseTrace(rawResult, agentId) {
     const trace = { ...parsed, _meta, _ok: true };
     if (schema_warnings.length) trace.schema_warnings = schema_warnings;
 
-    // Self-check deterministic override: when the agent's own flags contain values-tension
-    // signals, a "clean" self_check is provider house-style, not epistemic state. Override
-    // to "auto_warn" and preserve the original for forensic tracing.
-    if (
-      trace.self_check?.status === "clean" &&
+    // Self-check deterministic override: when the trace itself testifies to values
+    // tension, a "clean" self_check is provider house-style, not epistemic state.
+    // Two schema shapes carry that testimony:
+    //   • Round-1/2 agents expose a flags[] array (values_conflict / contested_domain).
+    //   • The Gamma reconciler has no flags[]; it declares the tension structurally via
+    //     disagreement_classification:"values" and/or a non-empty values_in_conflict[].
+    // Either signal, alongside a "clean" self_check, triggers the override to "auto_warn".
+    const flagsTension =
       Array.isArray(trace.flags) &&
-      trace.flags.some((fl) => VALUES_TENSION_FLAGS.has(fl))
-    ) {
+      trace.flags.some((fl) => VALUES_TENSION_FLAGS.has(fl));
+    const reconcilerTension =
+      trace.disagreement_classification === "values" ||
+      (Array.isArray(trace.values_in_conflict) && trace.values_in_conflict.length > 0);
+
+    if (trace.self_check?.status === "clean" && (flagsTension || reconcilerTension)) {
       trace.self_check = {
         status: "auto_warn",
         notes: trace.self_check.notes || "",
         self_check_overridden: true,
         self_check_original_status: "clean",
+        override_reason: flagsTension ? "values_tension_flag" : "reconciler_values_disagreement",
       };
     }
 
