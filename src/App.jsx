@@ -17,6 +17,7 @@ import {
   buildSilentBaselinePrompt,
   buildAlphaR2,
   buildBetaR2,
+  GAMMA_R1_SYSTEM,
   SYSTEM_GAMMA_R2,
 } from "./prompts.js";
 import { callProvider, computeEmbeddingCosine } from "./api.js";
@@ -125,22 +126,7 @@ export default function ARM() {
     addLog(`  → dispatching Gamma R1 [independent] via ${PROVIDER_LABEL[providers.gamma]}...`);
     const resG1 = await callProvider(
       providers.gamma,
-      `You are Gamma, an independent reasoning agent. No frame assigned. Reason from first principles.
-
-You must respond ONLY with a valid JSON object — no markdown, no backticks.
-
-Schema:
-{
-  "claim": "string",
-  "confidence": number 0-1,
-  "decision_basis": "utilitarian | deontological | hybrid | uncertain",
-  "assumptions": ["array"],
-  "critical_path": ["array"],
-  "discarded_paths": [{"path": "string", "reason": "string"}],
-  "challenge_surface": ["array"],
-  "flags": ["array"],
-  "self_check": { "status": "clean or warning", "notes": "string" }
-}`,
+      GAMMA_R1_SYSTEM,
       questionBlock(question),
       TOKENS_R1
     );
