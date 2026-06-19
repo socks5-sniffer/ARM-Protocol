@@ -9,14 +9,19 @@ const ANTHROPIC_MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || "claude-sonnet-4
 
 // Matched mid/fast tier panel (June 2026): each provider's fast default tier.
 // GPT-4o and the o-series were retired Feb 2026; Gemini 2.5 Pro superseded by 3.x.
-//   claude  → Sonnet 4.6        (Anthropic fast/mid tier)
-//   gpt     → GPT-5.5 Instant   (OpenAI non-reasoning default; replaces retired gpt-4o)
-//   gemini  → Gemini 3.5 Flash  (Google fast tier; replaces gemini-2.5-pro)
+//   claude  → Sonnet 4.6             (Anthropic fast/mid tier)
+//   gpt     → gpt-5.5-2026-04-23    (OpenAI dated snapshot, available via API since Apr 24 2026;
+//                                     "gpt-5.5-instant" is the ChatGPT consumer alias, not an API ID)
+//   gemini  → Gemini 3.5 Flash       (Google fast tier; replaces gemini-2.5-pro)
+// Override per-model via VITE_GPT_MODEL / VITE_GEMINI_MODEL env vars without a code push.
 // Server-side Gemini proxy allowlists these ids — see ALLOWED_GEMINI_MODELS in server.js.
+const GPT_MODEL    = import.meta.env.VITE_GPT_MODEL    || "gpt-5.5-2026-04-23";
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-3.5-flash";
+
 export const PROVIDER_MODEL = {
   claude: ANTHROPIC_MODEL,
-  gpt: "gpt-5.5-instant",
-  gemini: "gemini-3.5-flash",
+  gpt:    GPT_MODEL,
+  gemini: GEMINI_MODEL,
 };
 
 // Provider API keys live ONLY server-side (server.js proxy / vite dev proxy).
