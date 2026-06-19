@@ -337,13 +337,24 @@ app.use("/api/gemini", async (req, res) => {
 const traceDir = path.join(__dirname, "trace");
 if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
 
-app.post("/api/save-trace", enforceRateLimit, express.json({ limit: "2mb" }), (req, res) => {
+app.post("/api/save-trace", enforceRateLimit, (req, res) => {
   const key = req.headers["x-arm-token"];
   if (ACCESS_TOKEN && key !== ACCESS_TOKEN) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { filename, trace } = req.body || {};
+  // express.raw() on /api/* has already consumed the body as a Buffer before
+  // this route fires — a second express.json() pass would see an empty stream.
+  // Re-parse the Buffer directly instead.
+  let body = {};
+  try {
+    const raw = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+
+  const { filename, trace } = body;
   if (!filename || !trace || typeof trace !== "object") {
     return res.status(400).json({ error: "Missing filename or trace" });
   }
