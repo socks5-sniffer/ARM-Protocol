@@ -14,7 +14,7 @@ If you're looking for ways to contribute, here are our current research and deve
 4. **Production Proxy Hardening:** A keyed production proxy already exists (`server.js`, Express) — it serves `/api/*` with access-token auth and rate limiting, and the Vite dev proxy covers local development. Help is welcome hardening it further: per-provider rate limits, request logging/observability, and deployment docs for platforms beyond the included OpenShift manifests.
 5. **UI/UX Improvements:** Enhancements to the React frontend to better visualize the reasoning mesh and drift telemetry across cross-model runs.
 
-> **Already implemented (not needed):** Cross-model provider support for Claude, GPT, and Gemini is fully live. Per-agent provider selection is available in the UI. The current matched mid/fast panel is `claude-sonnet-4-6` / `gpt-5.5-2026-04-23` / `gemini-3.5-flash`; earlier runs used `gpt-4o` / `gemini-2.5-pro` (not tier-matched — see the model note in the README).
+> **Already implemented (not needed):** Cross-model provider support for Claude, GPT, and Gemini is fully live. Per-agent provider selection is available in the UI. The current matched mid/fast panel is `claude-sonnet-4-6` / `gpt-5.5-2026-04-23` / `gemini-3.5-flash`; earlier runs used `gpt-4o` / `gemini-2.5-pro` (not tier-matched — see the model note in the README). The deterministic `self_check` override (`clean` → `auto_warn`) is fully implemented for both the R1/R2 agent schema (via `flags[]`) and the Gamma reconciler schema (via `disagreement_classification` / `values_in_conflict`) — schema version `arm-trace-v1.2`.
 
 ## 🛠️ How to Contribute
 
