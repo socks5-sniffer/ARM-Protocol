@@ -267,7 +267,7 @@ Gamma R2 adds:
 ### Prerequisites
 - Node.js
 - An Anthropic API key (Claude) — required
-- An OpenAI API key (GPT-5.5 Instant) — optional, for cross-model runs
+- An OpenAI API key (`gpt-5.5-2026-04-23`) — optional, for cross-model runs
 - A Google Gemini API key (Gemini 3.5 Flash) — optional, for cross-model runs
 
 ### Installation

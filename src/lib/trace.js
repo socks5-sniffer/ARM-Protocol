@@ -154,6 +154,7 @@ export function computeTFIDFCosine(traces) {
   }
 
   const vectors = docs.map((terms) => {
+    if (!terms.length) return new Map();
     const tf = new Map();
     for (const t of terms) tf.set(t, (tf.get(t) || 0) + 1);
     const vec = new Map();
