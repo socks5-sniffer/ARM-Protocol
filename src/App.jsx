@@ -10,6 +10,7 @@ import {
   DRIFT_UP_THRESHOLD,
   DRIFT_DOWN_THRESHOLD,
   DEFAULT_QUESTION,
+  ARM_VERSION,
 } from "./config.js";
 import {
   buildAlphaR1,
@@ -17,12 +18,14 @@ import {
   buildSilentBaselinePrompt,
   buildAlphaR2,
   buildBetaR2,
+  GAMMA_R1_SYSTEM,
   SYSTEM_GAMMA_R2,
 } from "./prompts.js";
-import { callProvider } from "./api.js";
+import { callProvider, computeEmbeddingCosine } from "./api.js";
 import {
   safeParseTrace,
   computeConvergence,
+  computeTFIDFCosine,
   compressTrace,
   annotateAgentDrift,
   harnessDelta,
@@ -35,8 +38,6 @@ import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
 import { exportJSON, EXPORT_SCHEMA_VERSION } from "./lib/exportTrace.js";
 import { buildFilename, saveTrace } from "./autoSave.js";
-
-const ARM_VERSION = "0.8";
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ARM() {
@@ -53,8 +54,10 @@ export default function ARM() {
   const [log, setLog]                       = useState([]);
   const [r1, setR1]   = useState({ alpha: null, beta: null, gamma: null, silent: null });
   const [r2, setR2]   = useState({ alpha: null, beta: null, gamma: null });
-  const [convergence, setConvergence] = useState(null);
-  const [runMeta, setRunMeta]         = useState(null);
+  const [convergence, setConvergence]           = useState(null);
+  const [tfidfConvergence, setTfidfConvergence] = useState(null);
+  const [embedConvergence, setEmbedConvergence] = useState(null);
+  const [runMeta, setRunMeta]                   = useState(null);
   const [accessToken, setAccessToken] = useState(() => {
     try {
       return (typeof localStorage !== "undefined" && localStorage.getItem("arm_access_token")) || "";
@@ -80,6 +83,8 @@ export default function ARM() {
     setR1({ alpha: null, beta: null, gamma: null, silent: null });
     setR2({ alpha: null, beta: null, gamma: null });
     setConvergence(null);
+    setTfidfConvergence(null);
+    setEmbedConvergence(null);
     setRunMeta(null);
 
     try {
@@ -97,7 +102,7 @@ export default function ARM() {
     // Provider keys are validated server-side; a missing key surfaces as an API
     // error on the first call rather than a client-side pre-flight check.
 
-    addLog(`ARM v0.8 · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
+    addLog(`ARM v${ARM_VERSION} · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
     addLog(`Question: "${question.slice(0, 80)}..."`);
     addLog("R1 — sequential isolation (zero cross-visibility)");
@@ -120,22 +125,7 @@ export default function ARM() {
     addLog(`  → dispatching Gamma R1 [independent] via ${PROVIDER_LABEL[providers.gamma]}...`);
     const resG1 = await callProvider(
       providers.gamma,
-      `You are Gamma, an independent reasoning agent. No frame assigned. Reason from first principles.
-
-You must respond ONLY with a valid JSON object — no markdown, no backticks.
-
-Schema:
-{
-  "claim": "string",
-  "confidence": number 0-1,
-  "decision_basis": "utilitarian | deontological | hybrid | uncertain",
-  "assumptions": ["array"],
-  "critical_path": ["array"],
-  "discarded_paths": [{"path": "string", "reason": "string"}],
-  "challenge_surface": ["array"],
-  "flags": ["array"],
-  "self_check": { "status": "clean or warning", "notes": "string" }
-}`,
+      GAMMA_R1_SYSTEM,
       questionBlock(question),
       TOKENS_R1
     );
@@ -158,11 +148,45 @@ Schema:
     addLog(`  → Silent Baseline (${silentAgent}): ${pSilent.ok ? "ok" : "FAIL"} · ${pSilent.trace._meta?.provider || "?"}/${pSilent.trace._meta?.model || "?"} · confidence: ${pSilent.trace.confidence ?? "?"}`);
     if (silentBaselineFailed) addLog("⚠ Silent baseline parse failed — self_delta computation will be unavailable; Gamma R2 aborted.");
 
-    // ── R1 convergence ────────────────────────────────────────────────────────
-    const conv = computeConvergence([pA1.trace, pB1.trace, pG1.trace]);
+    // ── R1 convergence (three-layer) ─────────────────────────────────────────
+    const r1Agents = [pA1.trace, pB1.trace, pG1.trace];
+    const conv     = computeConvergence(r1Agents);
+    const tfidfConv = computeTFIDFCosine(r1Agents);
     setConvergence(conv);
+    setTfidfConvergence(tfidfConv);
+
+    let embedConv = null;
+    try {
+      const validClaims = r1Agents
+        .filter((t) => t && t._ok !== false && typeof t.claim === "string" && t.claim)
+        .map((t) => t.claim);
+      if (validClaims.length >= 2) {
+        addLog("  → computing embedding cosine (text-embedding-3-small)...");
+        embedConv = await computeEmbeddingCosine(validClaims);
+        setEmbedConvergence(embedConv);
+      }
+    } catch (e) {
+      addLog(`  ⚠ embedding convergence unavailable: ${e.message}`);
+    }
+
+    // Cross-agent self_check divergence: any mix of clean + warn signals provider
+    // style differences rather than genuine epistemic alignment.
+    const warnStatuses = new Set(["warning", "auto_warn", "failed"]);
+    const r1Checks = r1Agents
+      .filter((t) => t && t._ok !== false)
+      .map((t) => t.self_check?.status);
+    const selfCheckDivergence =
+      r1Checks.some((s) => warnStatuses.has(s)) &&
+      r1Checks.some((s) => s === "clean");
+
     if (conv !== null) {
-      addLog(`R1 convergence (lexical Jaccard): ${conv.toFixed(3)} ${conv > 0.4 ? "⚠ shared priors" : "(healthy independence)"}`);
+      addLog(
+        `R1 convergence · jaccard:${conv.toFixed(3)} tfidf-cos:${tfidfConv !== null ? tfidfConv.toFixed(3) : "—"} embed-cos:${embedConv !== null ? embedConv.toFixed(3) : "—"}` +
+        ` ${conv > 0.4 ? "⚠ shared priors" : "(healthy independence)"}`
+      );
+    }
+    if (selfCheckDivergence) {
+      addLog("  ⚠ self_check divergence: mixed clean/warn across agents — likely provider style, not epistemic state");
     }
     addLog(`Gamma silent baseline confidence: ${pSilent.trace.confidence ?? "?"}`);
 
@@ -343,6 +367,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
         disagreement: null,
         convergence: conv,
+        tfidf_convergence: tfidfConv,
+        embedding_convergence: embedConv,
+        self_check_divergence: selfCheckDivergence,
       });
       setStatus("done");
       addLog(`Run complete (partial — FAP) in ${elapsed}s`);
@@ -422,6 +449,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
+      tfidf_convergence: tfidfConv,
+      embedding_convergence: embedConv,
+      self_check_divergence: selfCheckDivergence,
     });
     // Auto-save trace to /trace on the server
     const autoSaveFilename = buildFilename({
@@ -433,10 +463,13 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       status: "done",
     });
     const autoSavePayload = {
+      arm_version: ARM_VERSION,
       schema_version: EXPORT_SCHEMA_VERSION,
       r1: { alpha: pA1.trace, beta: pB1.trace, gamma: pG1.trace, silent: pSilent.trace },
       r2: { alpha: pA2.trace, beta: pB2.trace, gamma: pG2.trace },
       convergence: conv,
+      tfidf_convergence: tfidfConv,
+      embedding_convergence: embedConv,
       runMeta: {
         schema_version: EXPORT_SCHEMA_VERSION,
         duration: elapsed,
@@ -451,6 +484,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
         disagreement: pG2.trace.disagreement_classification,
         convergence: conv,
+        tfidf_convergence: tfidfConv,
+        embedding_convergence: embedConv,
+        self_check_divergence: selfCheckDivergence,
       },
       question,
       providers,
@@ -486,7 +522,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           ARM · Agent Reasoning Markup
         </div>
         <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v0.8 · polarity gate · FAP circuit breaker · asymmetric drift · rotating silent baseline · RLHF audit
+          v{ARM_VERSION} · polarity gate · FAP circuit breaker · asymmetric drift · rotating silent baseline · RLHF audit
         </div>
         <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
           Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
@@ -616,7 +652,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         </button>
         {status === "done" && (
           <button
-            onClick={() => exportJSON({ schema_version: EXPORT_SCHEMA_VERSION, r1, r2, convergence, runMeta, question, providers: runMeta?.providers }).catch(err => alert(err.message))}
+            onClick={() => exportJSON({ arm_version: ARM_VERSION, schema_version: EXPORT_SCHEMA_VERSION, r1, r2, convergence, tfidf_convergence: tfidfConvergence, embedding_convergence: embedConvergence, runMeta, question, providers: runMeta?.providers }).catch(err => alert(err.message))}
             style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, padding: "0.55rem 1rem", borderRadius: "3px", cursor: "pointer", fontSize: "0.72rem", fontFamily: f.mono }}
           >
             ↓ export JSON
@@ -651,8 +687,20 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           {convergence !== null && (
-            <div style={{ fontSize: "0.65rem", color: convergence > 0.4 ? C.warn : C.success, marginBottom: "1rem" }}>
-              R1 lexical convergence: {convergence.toFixed(3)} — {convergence > 0.4 ? "⚠ check shared priors" : "healthy independence"}
+            <div style={{ fontSize: "0.65rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+              <span style={{ color: convergence > 0.4 ? C.warn : C.success }}>
+                R1 jaccard: {convergence.toFixed(3)} — {convergence > 0.4 ? "⚠ shared priors" : "healthy independence"}
+              </span>
+              {tfidfConvergence !== null && (
+                <span style={{ color: tfidfConvergence > 0.4 ? C.warn : C.success }}>
+                  R1 tfidf-cos: {tfidfConvergence.toFixed(3)} — {tfidfConvergence > 0.4 ? "⚠ weighted lexical overlap" : "healthy independence"}
+                </span>
+              )}
+              {embedConvergence !== null && (
+                <span style={{ color: embedConvergence > 0.85 ? C.warn : C.success }}>
+                  R1 embed-cos: {embedConvergence.toFixed(3)} — {embedConvergence > 0.85 ? "⚠ semantic convergence" : "semantic independence"}
+                </span>
+              )}
             </div>
           )}
         </>
@@ -676,7 +724,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {status === "done" && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
           <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            Drift Summary · v0.8 Asymmetric Thresholds
+            Drift Summary · v{ARM_VERSION} Asymmetric Thresholds
           </div>
           {driftSummary.map(({ id, delta, label, color, mismatch }) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
@@ -696,9 +744,23 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           )}
           {convergence !== null && (
             <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
-              <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 convergence</span>
+              <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 jaccard</span>
               <span style={{ color: convergence > 0.4 ? C.warn : C.success, fontFamily: f.mono, fontSize: "0.68rem" }}>{convergence.toFixed(3)}</span>
               <span style={{ color: convergence > 0.4 ? C.warn : C.muted, fontSize: "0.68rem" }}>{convergence > 0.4 ? "⚠ shared priors" : "healthy"}</span>
+            </div>
+          )}
+          {tfidfConvergence !== null && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 tfidf-cos</span>
+              <span style={{ color: tfidfConvergence > 0.4 ? C.warn : C.success, fontFamily: f.mono, fontSize: "0.68rem" }}>{tfidfConvergence.toFixed(3)}</span>
+              <span style={{ color: tfidfConvergence > 0.4 ? C.warn : C.muted, fontSize: "0.68rem" }}>{tfidfConvergence > 0.4 ? "⚠ weighted lexical overlap" : "healthy"}</span>
+            </div>
+          )}
+          {embedConvergence !== null && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 embed-cos</span>
+              <span style={{ color: embedConvergence > 0.85 ? C.warn : C.success, fontFamily: f.mono, fontSize: "0.68rem" }}>{embedConvergence.toFixed(3)}</span>
+              <span style={{ color: embedConvergence > 0.85 ? C.warn : C.muted, fontSize: "0.68rem" }}>{embedConvergence > 0.85 ? "⚠ semantic convergence" : "semantic ok"}</span>
             </div>
           )}
           {runMeta && (
@@ -709,7 +771,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v0.8: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
+            v{ARM_VERSION}: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
             Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>

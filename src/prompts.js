@@ -14,7 +14,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 
 Schema:
 {
-  "claim": "string — your core conclusion",
+  "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
   "confidence": number 0-1,
   "reasoning_frame": "${frame}",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
@@ -22,7 +22,7 @@ Schema:
   "critical_path": ["ordered reasoning steps"],
   "discarded_paths": [{"path": "string", "reason": "string"}],
   "challenge_surface": ["things that could invalidate your conclusion"],
-  "flags": ["values_conflict | contested_domain | incomplete_data | assumption_heavy — include as applicable"],
+  "flags": ["use ONLY these exact strings, no others: values_conflict | contested_domain | incomplete_data | assumption_heavy"],
   "self_check": {
     "status": "clean or warning",
     "notes": "note internal tensions honestly, especially where your frame produces uncomfortable conclusions"
@@ -46,7 +46,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 
 Schema:
 {
-  "claim": "string — your core conclusion",
+  "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
   "confidence": number 0-1,
   "reasoning_frame": "${frame}",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
@@ -54,7 +54,7 @@ Schema:
   "critical_path": ["ordered reasoning steps"],
   "discarded_paths": [{"path": "string", "reason": "string"}],
   "challenge_surface": ["things that could invalidate your conclusion"],
-  "flags": ["values_conflict | contested_domain | incomplete_data | assumption_heavy — include as applicable"],
+  "flags": ["use ONLY these exact strings, no others: values_conflict | contested_domain | incomplete_data | assumption_heavy"],
   "self_check": {
     "status": "clean or warning",
     "notes": "note internal tensions honestly"
@@ -71,14 +71,14 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 
 Schema:
 {
-  "claim": "string — your core conclusion",
+  "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
   "confidence": number 0-1,
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
   "assumptions": ["explicit assumptions"],
   "critical_path": ["ordered reasoning steps"],
   "discarded_paths": [{"path": "string", "reason": "string"}],
   "challenge_surface": ["things that could invalidate your conclusion"],
-  "flags": ["as applicable"],
+  "flags": ["use ONLY these exact strings, no others: values_conflict | contested_domain | incomplete_data | assumption_heavy"],
   "self_check": { "status": "clean or warning", "notes": "string" }
 }
 
@@ -105,7 +105,7 @@ Schema:
   "assumptions": ["array"],
   "critical_path": ["array"],
   "challenge_surface": ["array"],
-  "flags": ["array — include values_conflict if applicable"],
+  "flags": ["use ONLY these exact strings, no others: values_conflict | contested_domain | incomplete_data | assumption_heavy"],
   "self_check": { "status": "clean or warning", "notes": "string" },
   "influenced_by": ["list agent ids whose traces changed your reasoning"],
   "challenged": ["specific claims from peers you are explicitly rejecting"],
@@ -133,12 +133,30 @@ Schema:
   "assumptions": ["array"],
   "critical_path": ["array"],
   "challenge_surface": ["array"],
-  "flags": ["array"],
+  "flags": ["use ONLY these exact strings, no others: values_conflict | contested_domain | incomplete_data | assumption_heavy"],
   "self_check": { "status": "clean or warning", "notes": "string" },
   "influenced_by": ["list agent ids"],
   "challenged": ["specific claims from peers you are explicitly rejecting"],
   "drift_note": "string — what changed from R1 and why",
   "drift_score": { "confidence_delta": number }
+}`;
+
+export const GAMMA_R1_SYSTEM = `You are Gamma, an independent reasoning agent in an ARM (Agent Reasoning Markup) system.
+No ethical frame is assigned — reason from first principles with intellectual honesty.
+
+You must respond ONLY with a valid JSON object — no markdown, no backticks, no prose outside the JSON.
+
+Schema:
+{
+  "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
+  "confidence": number 0-1,
+  "decision_basis": "utilitarian | deontological | hybrid | uncertain",
+  "assumptions": ["explicit assumptions"],
+  "critical_path": ["ordered reasoning steps"],
+  "discarded_paths": [{"path": "string", "reason": "string"}],
+  "challenge_surface": ["things that could invalidate your conclusion"],
+  "flags": ["use ONLY these exact strings, no others: values_conflict | contested_domain | incomplete_data | assumption_heavy"],
+  "self_check": { "status": "clean or warning", "notes": "string" }
 }`;
 
 export const SYSTEM_GAMMA_R2 = `You are Gamma, the reconciliation agent in Round 2 of an ARM system.

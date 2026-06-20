@@ -80,7 +80,10 @@ export function AgentCard({ agentId, trace, round, isSilent }) {
 
           {trace.self_check && (
             <div style={{ marginTop: "0.4rem" }}>
-              <Tag color={trace.self_check.status === "clean" ? C.success : C.warn}>self-check: {trace.self_check.status}</Tag>
+              <Tag color={trace.self_check.status === "clean" ? C.success : C.warn}>
+                self-check: {trace.self_check.status}
+                {trace.self_check.self_check_overridden ? " [overridden]" : ""}
+              </Tag>
             </div>
           )}
 

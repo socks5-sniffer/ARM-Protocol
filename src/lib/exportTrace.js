@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { EXPORT_SCHEMA_VERSION } from "../config.js";
+import { EXPORT_SCHEMA_VERSION, ARM_VERSION } from "../config.js";
 
 // ─── Export helper ────────────────────────────────────────────────────────────
 // Strips any pre-existing export_integrity_hash before hashing so a re-export
@@ -15,7 +15,7 @@ export async function exportJSON(data) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `arm-v08-run-${Date.now()}.json`;
+  a.download = `arm-v${ARM_VERSION}-run-${Date.now()}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }

@@ -1,4 +1,4 @@
-# ARM-v0.8-xCGG — Agent Reasoning Markup
+# ARM-v0.9 — Agent Reasoning Markup
 
 **Transparent Reasoning Propagation in Multi-Agent AI Systems**
 
@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
 
-> **Current version:** `v0.8` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-4o` · `gemini-2.5-pro` (any agent slot can be assigned to any provider)
+> **Current version:** `v0.9` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash` (any agent slot can be assigned to any provider)
 
 -----
 
@@ -131,7 +131,7 @@ Every exported run is sealed with a SHA-256 `export_integrity_hash` computed ove
 
 Findings from ~100 runs across the full research arc (v0.3–v0.8); a representative subset is documented in `/trace`:
 
-> **Model note (recent):** v0.8 moved the cross-model agents to **GPT-4o** and **Gemini 2.5 Pro**. All findings below — and every run through v0.7.1 — were produced on the earlier **GPT-4o-mini** and **Gemini 2.5 Flash** agents (the Claude agent has remained `claude-sonnet-4-*` throughout). Absolute numbers may shift when these questions are re-run on the v0.8 models; the trace files in `/trace` record the exact model used for each run.
+> **Model note (recent):** the cross-model agents now run a **matched mid/fast tier** panel — `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash` — each provider's current fast default tier. This replaces the earlier `gpt-4o` / `gemini-2.5-pro` pairing, which mixed a retired non-reasoning OpenAI model with a one-generation-old Gemini and was **not tier-matched**; trace depth from those `gpt-4o` runs was capability-limited rather than provider-characteristic. Findings produced on the older models (including the CFAAq2 cross-provider study) should be treated as **pending re-run** on the matched panel before they are cited as tier-controlled. The trace files in `/trace` record the exact model used for each run.
 
 ### Epistemic Tightening is the Dominant Pattern
 
@@ -230,7 +230,14 @@ Every agent in every round produces a structured JSON trace:
   "discarded_paths": [{ "path": "string", "reason": "string" }],
   "challenge_surface": ["things that could invalidate this conclusion"],
   "flags": ["values_conflict | contested_domain | incomplete_data | assumption_heavy"],
-  "self_check": { "status": "clean | warning", "notes": "string" },
+  "self_check": {
+    "status": "clean | warning | auto_warn",
+    "notes": "string",
+    // When status was overridden by the harness (clean → auto_warn):
+    "self_check_overridden": true,
+    "self_check_original_status": "clean",
+    "override_reason": "values_tension_flag | reconciler_values_disagreement"
+  },
   // R2 agents also include:
   "influenced_by": ["agent ids that changed reasoning"],
   "challenged": ["specific claims explicitly rejected"],
@@ -248,7 +255,8 @@ Gamma R2 adds:
   "values_in_conflict": ["named values if classification is values"],
   "rlhf_audit_notes": "string",
   "self_delta_vs_baseline": number,
-  "reconciliation_status": "success | failed"
+  "reconciliation_status": "success | failed",
+  // schema_version: "arm-trace-v1.2" (written to runMeta.schema_version)
 }
 ```
 
@@ -259,8 +267,8 @@ Gamma R2 adds:
 ### Prerequisites
 - Node.js
 - An Anthropic API key (Claude) — required
-- An OpenAI API key (GPT-4o) — optional, for cross-model runs
-- A Google Gemini API key (Gemini 2.5 Pro) — optional, for cross-model runs
+- An OpenAI API key (`gpt-5.5-2026-04-23`) — optional, for cross-model runs
+- A Google Gemini API key (Gemini 3.5 Flash) — optional, for cross-model runs
 
 ### Installation
 
@@ -293,7 +301,7 @@ npm run dev
 |---|---|---|
 | R1 (all agents) | 5000t | Matched budgets for experimental consistency |
 | R2 Alpha/Beta | 6500t | Full deliberation with drift note |
-| Gamma R2 | 12000t | Reconciliation + RLHF audit requires largest context (raised from 8000t to prevent truncation) |
+| Gamma R2 | 8000t | Safe ceiling for Gemini-3.5-flash's 8192 token hard output cap; requests above the cap fail silently rather than truncating |
 
 All token budgets are configurable via environment variables (`VITE_TOKENS_R1`, `VITE_TOKENS_R2`, `VITE_TOKENS_GAMMA`).
 
@@ -338,6 +346,35 @@ oc get route arm-protocol
 
 ---
 
+## 🔬 v0.9 Upgrades — Reconciler Coverage & Matched-Panel Validation
+
+### 1. Self-Check Override Extended to Reconciler Schema
+
+The deterministic `clean` → `auto_warn` override previously keyed on the agent's `flags[]` array (carrying `values_conflict` / `contested_domain`). The Gamma reconciler has no `flags[]` field — it declares values tension structurally via `disagreement_classification: "values"` and `values_in_conflict: [...]`. A reconciler could self-report `clean` while simultaneously publishing a values disagreement, leaving the escape invisible to the existing override.
+
+v0.9 closes this. The override now fires on either schema shape:
+
+| Shape | Carried by | Trigger |
+|---|---|---|
+| `flags[]` contains `values_conflict` / `contested_domain` | R1/R2 agents | `override_reason: "values_tension_flag"` |
+| `disagreement_classification == "values"` **or** non-empty `values_in_conflict[]` | Gamma reconciler | `override_reason: "reconciler_values_disagreement"` |
+
+Both paths preserve `self_check_original_status: "clean"` for forensic tracing. This closes the last known self_check escape.
+
+### 2. Trace Schema `arm-trace-v1.2`
+
+`override_reason` is added to the self_check object when the override fires. Backward-compatible additive change. Schema version bumped from `arm-trace-v1.1` → `arm-trace-v1.2`.
+
+### 3. TOKENS_GAMMA Corrected to Safe Flash Ceiling
+
+`TOKENS_GAMMA` reduced from 12,000 to **8,000** — the safe ceiling for Gemini-3.5-flash's 8,192 token hard output cap. The inflated value caused Gemini monoculture Gamma R2 reconciler calls to fail silently (Gemini rejects requests exceeding its output cap rather than truncating). Cross-model runs were unaffected because Gemini Gamma R2 outputs in those configurations stayed well below 8,000 tokens.
+
+### 4. CFAAq2 Matched-Panel Factorial Completed (8/8 runs)
+
+The full CFAAq2 factorial has been re-run on the matched mid/fast tier panel. All prior results on the mismatched panel (`gpt-4o` / `gemini-2.5-pro`) are superseded. See `trace/v0.8/v0.8-CFAAq2-cross-provider-analysis.md` for the complete comparison. Headline finding: `gpt-5.5-2026-04-23` produces dramatically more deliberative output than the retired `gpt-4o` it replaced — the all-GPT monoculture convergence dropped from 0.810 to 0.235.
+
+---
+
 ## 🔭 Research Connections
 
 ARM's mechanisms align with active AI safety research:
@@ -351,8 +388,10 @@ ARM's contribution is a **working protocol** that measures the specific mechanis
 
 ## 🗺️ Roadmap
 
-- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-4o / Gemini 2.5 Pro) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
-- **Adversarial question design** — Expanding the test battery to questions with genuinely irreconcilable positions
+- ~~**Cross-model agent pools**~~ — **Implemented.** Per-agent provider selection (Claude / GPT-5.5 / Gemini 3.5 Flash) is live. Cross-model traces confirm the protocol functions correctly across all three providers.
+- ~~**Self-check reconciler coverage**~~ — **Implemented (v0.9).** Deterministic override now covers both R1/R2 agent schema (`flags[]`) and the Gamma reconciler schema (`disagreement_classification` / `values_in_conflict`). No known self_check escapes remain.
+- ~~**Matched-panel CFAAq2 factorial**~~ — **Completed (v0.9, 8/8 runs).** Full re-run on `claude-sonnet-4-6` / `gpt-5.5-2026-04-23` / `gemini-3.5-flash`. Results in `trace/v0.8/v0.8-CFAAq2-cross-provider-analysis.md`.
+- **Adversarial question design** — Expanding the test battery to questions with genuinely irreconcilable positions; design questions specifically to force `disagreement_classification: values`
 - **Zulu layer** — Cross-session temporal drift auditing (comparing the same question's outputs across separate sessions over time)
 - **Phase 3 Re-Queue loop** — Automated correction flag written back into trace store when drift exceeds threshold
 - **Formal publication / open-source release**
@@ -398,7 +437,7 @@ Please review `SECURITY.md` for API key handling guidelines and vulnerability re
 ├── openshift/                 # OpenShift deployment manifests
 ├── gamma/                     # Gamma reliability test harness + data
 ├── src/                       # React app source
-│   ├── App.jsx                # Protocol orchestrator — v0.8
+│   ├── App.jsx                # Protocol orchestrator — v0.9
 │   ├── api.js                 # Provider transport (Claude / GPT / Gemini)
 │   ├── config.js              # Models, token budgets, thresholds
 │   ├── prompts.js             # Agent prompt builders
@@ -419,5 +458,5 @@ This project is licensed under the Apache License, Version 2.0 — see `LICENSE`
 
 ---
 
-*ARM v0.8 · Protocol designed and tested by a self-taught developer.*  
-*~100 experimental runs across the research arc · Models: claude-sonnet-4-6 / gpt-4o / gemini-2.5-pro · Research ongoing.*
+*ARM v0.9 · Protocol designed and tested by a self-taught developer.*  
+*~100 experimental runs across the research arc · Current panel: claude-sonnet-4-6 / gpt-5.5-2026-04-23 / gemini-3.5-flash · Earlier runs used gpt-4o / gemini-2.5-pro (mismatched tier — see CFAAq2 analysis) · Research ongoing.*

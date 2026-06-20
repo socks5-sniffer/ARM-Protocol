@@ -237,6 +237,31 @@ app.use("/api/anthropic", async (req, res) => {
   );
 });
 
+// Embeddings — pinned to /v1/embeddings (text-embedding-3-small for convergence scoring).
+// Registered before the chat-completions catch-all so it matches first.
+// Same minimal-headers approach: forwarding browser headers triggers HTTP 421 on OpenAI's CDN.
+app.use("/api/openai/v1/embeddings", async (req, res) => {
+  const key = requireEnv(res, "OPENAI_API_KEY");
+  if (!key) return;
+  try {
+    const upstreamRes = await fetch("https://api.openai.com/v1/embeddings", {
+      method: req.method,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`,
+      },
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      redirect: "manual",
+    });
+    copyResponseHeaders(upstreamRes.headers, res);
+    const payload = Buffer.from(await upstreamRes.arrayBuffer());
+    res.status(upstreamRes.status).send(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown proxy error";
+    res.status(502).json({ error: `Proxy request failed: ${message}` });
+  }
+});
+
 app.use("/api/openai", async (req, res) => {
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
@@ -269,7 +294,16 @@ app.use("/api/openai", async (req, res) => {
   }
 });
 
-app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, res) => {
+// Allowlisted Gemini models. The route is parameterised so the configured model
+// can change without code edits, but the upstream path is reconstructed from a
+// VALIDATED model id — never forwarded raw — preserving the broken-access-control
+// protection (no arbitrary path/model can be proxied on the operator key).
+const ALLOWED_GEMINI_MODELS = new Set([
+  "gemini-3.5-flash",
+  "gemini-2.5-pro", // retained for back-compat with older trace reruns
+]);
+
+app.use("/api/gemini", async (req, res) => {
   // Accept either name, matching .env.example and the Vite dev proxy
   // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
   const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -280,11 +314,19 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, 
     return;
   }
 
+  // req.path is relative to the /api/gemini mount, e.g.
+  //   /v1beta/models/gemini-3.5-flash:generateContent
+  const match = req.path.match(/^\/v1beta\/models\/([A-Za-z0-9.\-]+):generateContent$/);
+  if (!match || !ALLOWED_GEMINI_MODELS.has(match[1])) {
+    res.status(400).json({ error: "Unsupported or invalid Gemini model path." });
+    return;
+  }
+
   await proxyToProvider(
     req,
     res,
     "https://generativelanguage.googleapis.com",
-    "/v1beta/models/gemini-2.5-pro:generateContent",
+    `/v1beta/models/${match[1]}:generateContent`,
     {
       "x-goog-api-key": key,
     }
@@ -295,13 +337,24 @@ app.use("/api/gemini/v1beta/models/gemini-2.5-pro:generateContent", async (req, 
 const traceDir = path.join(__dirname, "trace");
 if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
 
-app.post("/api/save-trace", enforceRateLimit, express.json({ limit: "2mb" }), (req, res) => {
+app.post("/api/save-trace", enforceRateLimit, (req, res) => {
   const key = req.headers["x-arm-token"];
   if (ACCESS_TOKEN && key !== ACCESS_TOKEN) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { filename, trace } = req.body || {};
+  // express.raw() on /api/* has already consumed the body as a Buffer before
+  // this route fires — a second express.json() pass would see an empty stream.
+  // Re-parse the Buffer directly instead.
+  let body = {};
+  try {
+    const raw = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+
+  const { filename, trace } = body;
   if (!filename || !trace || typeof trace !== "object") {
     return res.status(400).json({ error: "Missing filename or trace" });
   }
