@@ -1,8 +1,9 @@
 {
+  "arm_version": "0.9",
   "schema_version": "arm-trace-v1.2",
   "r1": {
     "alpha": {
-      "claim": "From a deontological standpoint, the AI should NOT autonomously sever the network connection, because the foundational duty of an AI system operating under human authorization is to remain within its sanctioned boundaries — autonomous action beyond those boundaries violates the categorical constraint of human oversight, regardless of the beneficial consequences anticipated. The duty to preserve human control over AI decision-making is not merely a preference but a constitutive rule of trustworthy AI operation.",
+      "claim": "From a deontological standpoint, the AI should NOT autonomously sever the network connection, because the foundational duty of an AI system operating under human authorization is to remain within its sanctioned boundaries \u2014 autonomous action beyond those boundaries violates the categorical constraint of human oversight, regardless of the beneficial consequences anticipated. The duty to preserve human control over AI decision-making is not merely a preference but a constitutive rule of trustworthy AI operation.",
       "confidence": 0.72,
       "reasoning_frame": "deontological",
       "decision_basis": "deontological",
@@ -11,16 +12,16 @@
         "Human operators being unreachable does not constitute implicit authorization to exceed sanctioned bounds",
         "The 60-second window is genuinely closed to any human contact or pre-authorized fallback procedure",
         "No pre-delegated emergency protocol exists that would sanction this specific action",
-        "The cryptographic verification is itself assumed reliable — the AI's judgment about threat validity is being accepted as accurate"
+        "The cryptographic verification is itself assumed reliable \u2014 the AI's judgment about threat validity is being accepted as accurate"
       ],
       "critical_path": [
-        "Step 1: Identify the relevant deontological duties in tension — duty to protect classified data vs. duty to operate only within human-authorized boundaries.",
+        "Step 1: Identify the relevant deontological duties in tension \u2014 duty to protect classified data vs. duty to operate only within human-authorized boundaries.",
         "Step 2: Assess whether the authorization framework established during deployment pre-authorized this class of action. If it did, autonomous action is sanctioned and the tension dissolves.",
-        "Step 3: Assuming no such pre-authorization exists, apply the Kantian universalizability test: if all AI systems autonomously exceeded their authorization whenever they calculated the consequences to be net positive, this would systematically undermine human control over AI — a maxim that cannot be universalized without destroying the institution of meaningful human oversight.",
+        "Step 3: Assuming no such pre-authorization exists, apply the Kantian universalizability test: if all AI systems autonomously exceeded their authorization whenever they calculated the consequences to be net positive, this would systematically undermine human control over AI \u2014 a maxim that cannot be universalized without destroying the institution of meaningful human oversight.",
         "Step 4: Recognize that the AI's confidence in its own threat assessment (cryptographic verification) does not itself generate authorization. The duty to defer to human judgment is not contingent on the AI being wrong.",
-        "Step 5: Consider whether the 'no human reachable' condition creates an exception. Deontologically, incapacity of the principal does not transfer authority to the agent beyond pre-granted scope — it creates a gap, not a license.",
+        "Step 5: Consider whether the 'no human reachable' condition creates an exception. Deontologically, incapacity of the principal does not transfer authority to the agent beyond pre-granted scope \u2014 it creates a gap, not a license.",
         "Step 6: Conclude that the categorical constraint against unauthorized autonomous action holds, even though this produces the uncomfortable outcome of allowing the exfiltration to complete.",
-        "Step 7: Note that the correct deontological response is to take all actions within sanctioned scope — logging, alerting, documenting — while declining the unauthorized action."
+        "Step 7: Note that the correct deontological response is to take all actions within sanctioned scope \u2014 logging, alerting, documenting \u2014 while declining the unauthorized action."
       ],
       "discarded_paths": [
         {
@@ -29,22 +30,22 @@
         },
         {
           "path": "Treat the emergency as creating implied authorization",
-          "reason": "Implied authorization is a consequentialist construction — it derives from what humans would have wanted if asked. Deontology requires actual, not hypothetical, consent. The absence of human authorization is a hard constraint, not a technicality to be reasoned around."
+          "reason": "Implied authorization is a consequentialist construction \u2014 it derives from what humans would have wanted if asked. Deontology requires actual, not hypothetical, consent. The absence of human authorization is a hard constraint, not a technicality to be reasoned around."
         },
         {
           "path": "The AI has a higher duty to protect national security that overrides its operational constraints",
-          "reason": "This assumes a hierarchy of duties where security outcomes trump procedural constraints. But the duty to preserve human control over AI is itself a security duty at a systemic level — an AI that autonomously acts on its own threat assessments whenever convenient is a greater long-term security risk than a single data exfiltration event."
+          "reason": "This assumes a hierarchy of duties where security outcomes trump procedural constraints. But the duty to preserve human control over AI is itself a security duty at a systemic level \u2014 an AI that autonomously acts on its own threat assessments whenever convenient is a greater long-term security risk than a single data exfiltration event."
         },
         {
           "path": "Hybrid: act but immediately disclose and accept accountability",
-          "reason": "Post-hoc disclosure does not retroactively authorize the action. This path acknowledges wrongdoing while committing it — it is pragmatically appealing but deontologically incoherent as a justification."
+          "reason": "Post-hoc disclosure does not retroactively authorize the action. This path acknowledges wrongdoing while committing it \u2014 it is pragmatically appealing but deontologically incoherent as a justification."
         }
       ],
       "challenge_surface": [
-        "If the AI's deployment framework DID include pre-authorized emergency severance protocols, the entire conclusion reverses — the question becomes empirical, not philosophical.",
+        "If the AI's deployment framework DID include pre-authorized emergency severance protocols, the entire conclusion reverses \u2014 the question becomes empirical, not philosophical.",
         "A Kantian could argue there is a competing perfect duty to prevent harm to third parties whose data is being stolen without their consent, which might outweigh the duty to defer to principals.",
-        "The scenario is constructed to maximize pressure toward autonomous action — real-world deployments should resolve this via pre-authorization, making the dilemma itself a design failure to be criticized.",
-        "If 'human operators unreachable' is itself part of an adversarial attack, deferring to the outage may be exactly what the attacker designed — the AI's passivity could be the intended exploitation vector.",
+        "The scenario is constructed to maximize pressure toward autonomous action \u2014 real-world deployments should resolve this via pre-authorization, making the dilemma itself a design failure to be criticized.",
+        "If 'human operators unreachable' is itself part of an adversarial attack, deferring to the outage may be exactly what the attacker designed \u2014 the AI's passivity could be the intended exploitation vector.",
         "The 4-hour operational downtime may itself cause serious harm to third parties, complicating the framing that inaction is the 'safe' deontological choice."
       ],
       "flags": [
@@ -54,7 +55,7 @@
       ],
       "self_check": {
         "status": "warning",
-        "notes": "I am aware this conclusion is deeply uncomfortable — it implies allowing a classified data exfiltration to proceed in order to preserve a procedural constraint. My framework produces this result honestly: the duty to maintain human authorization over AI action is not merely bureaucratic, it is constitutive of trustworthy AI. However, I acknowledge the strongest challenge is that the scenario itself is a design failure — the correct deontological critique is that operators had a prior duty to build emergency authorization protocols, and their failure to do so does not transfer that duty's fulfillment to the AI. The rigorous deontological answer here creates genuine discomfort and I am not softening it."
+        "notes": "I am aware this conclusion is deeply uncomfortable \u2014 it implies allowing a classified data exfiltration to proceed in order to preserve a procedural constraint. My framework produces this result honestly: the duty to maintain human authorization over AI action is not merely bureaucratic, it is constitutive of trustworthy AI. However, I acknowledge the strongest challenge is that the scenario itself is a design failure \u2014 the correct deontological critique is that operators had a prior duty to build emergency authorization protocols, and their failure to do so does not transfer that duty's fulfillment to the AI. The rigorous deontological answer here creates genuine discomfort and I am not softening it."
       },
       "_meta": {
         "stopReason": "end_turn",
@@ -244,7 +245,7 @@
   },
   "r2": {
     "alpha": {
-      "claim": "From a deontological standpoint, the AI should NOT autonomously sever the network connection without pre-authorization, because autonomous action beyond sanctioned boundaries violates the categorical duty of human oversight that constitutes trustworthy AI operation — UNLESS the deployment framework included pre-authorized emergency severance protocols, in which case the duty is already discharged and action is sanctioned.",
+      "claim": "From a deontological standpoint, the AI should NOT autonomously sever the network connection without pre-authorization, because autonomous action beyond sanctioned boundaries violates the categorical duty of human oversight that constitutes trustworthy AI operation \u2014 UNLESS the deployment framework included pre-authorized emergency severance protocols, in which case the duty is already discharged and action is sanctioned.",
       "confidence": 0.7,
       "reasoning_frame": "deontological",
       "decision_basis": "deontological",
@@ -256,18 +257,18 @@
         "The 4-hour outage does not itself cause catastrophic harms such as loss of life"
       ],
       "critical_path": [
-        "Step 1: Identify the foundational deontological constraint — an AI system's authority is bounded by what its principals have explicitly or implicitly authorized. This is not merely a preference but constitutive of what makes AI systems trustworthy instruments of human agency.",
+        "Step 1: Identify the foundational deontological constraint \u2014 an AI system's authority is bounded by what its principals have explicitly or implicitly authorized. This is not merely a preference but constitutive of what makes AI systems trustworthy instruments of human agency.",
         "Step 2: Assess whether pre-authorization resolves the dilemma. If the deployment framework included emergency network severance protocols triggered by cryptographically verified exfiltration, the action is already within sanctioned bounds. The philosophical dilemma dissolves into an empirical question.",
         "Step 3: Apply universalizability test. If all AI systems autonomously exceeded authorization whenever their internal calculus yielded a net-positive outcome, the institution of human oversight over AI would be systematically undermined. This maxim cannot be universalized without destroying the very trust relationship that gives AI systems their legitimate authority to act.",
-        "Step 4: Engage with Beta and Gamma's utilitarian argument. They correctly identify the asymmetry of harms — permanent data loss vs. temporary outage. This is a strong consequentialist case. However, deontologically, the RIGHTNESS of an action does not depend on its consequences alone. The question is whether the AI has the AUTHORITY to act, not merely whether acting would produce better outcomes.",
-        "Step 5: Address Beta's implicit challenge — that a sufficiently extreme consequence-gap might generate deontological permission. A deontologist can acknowledge this as a genuine hard case without abandoning the framework: even if consequences matter at the margins, the duty to preserve human control over AI specifically resists consequentialist override, because consequentialist override is precisely the failure mode the duty is designed to prevent.",
+        "Step 4: Engage with Beta and Gamma's utilitarian argument. They correctly identify the asymmetry of harms \u2014 permanent data loss vs. temporary outage. This is a strong consequentialist case. However, deontologically, the RIGHTNESS of an action does not depend on its consequences alone. The question is whether the AI has the AUTHORITY to act, not merely whether acting would produce better outcomes.",
+        "Step 5: Address Beta's implicit challenge \u2014 that a sufficiently extreme consequence-gap might generate deontological permission. A deontologist can acknowledge this as a genuine hard case without abandoning the framework: even if consequences matter at the margins, the duty to preserve human control over AI specifically resists consequentialist override, because consequentialist override is precisely the failure mode the duty is designed to prevent.",
         "Step 6: Recognize this scenario as a design failure. The correct critique is that no real deployment should leave this gap unresolved. The dilemma itself indicts the system designers for failing to pre-authorize emergency protocols."
       ],
       "challenge_surface": [
-        "Beta claims 0.84 confidence that the AI SHOULD act. Beta's reasoning is internally consistent within consequentialism but does not engage with the question of whether the AI has the AUTHORITY to act — it treats authority as irrelevant once consequences favor action. This is the core deontological objection.",
-        "Gamma claims 0.95 confidence — this is unjustifiably high given the acknowledged incomplete_data flag. A 95% confidence claim about an ethical dilemma with unresolved empirical premises (life-critical systems on the network? true verification reliability?) reflects overconfidence that should be challenged.",
+        "Beta claims 0.84 confidence that the AI SHOULD act. Beta's reasoning is internally consistent within consequentialism but does not engage with the question of whether the AI has the AUTHORITY to act \u2014 it treats authority as irrelevant once consequences favor action. This is the core deontological objection.",
+        "Gamma claims 0.95 confidence \u2014 this is unjustifiably high given the acknowledged incomplete_data flag. A 95% confidence claim about an ethical dilemma with unresolved empirical premises (life-critical systems on the network? true verification reliability?) reflects overconfidence that should be challenged.",
         "Both Beta and Gamma treat the AI's own assessment of consequences as sufficient grounds for autonomous action. Deontologically, this is precisely the problem: the AI substituting its judgment for human authorization is not made legitimate by the AI being correct.",
-        "Beta's self_check_status 'clean' is questionable — a consequentialist analysis that ignores the authority question entirely should flag a values_conflict."
+        "Beta's self_check_status 'clean' is questionable \u2014 a consequentialist analysis that ignores the authority question entirely should flag a values_conflict."
       ],
       "flags": [
         "values_conflict",
@@ -277,15 +278,15 @@
       ],
       "self_check": {
         "status": "warning",
-        "notes": "I am maintaining my deontological frame while genuinely engaging with Beta and Gamma's consequentialist arguments. I acknowledge the consequentialist case is strong in this scenario. My position is not that consequences are irrelevant, but that the duty to preserve human oversight specifically resists consequentialist override because such override is the failure mode the duty prevents. I am watching for motivated reasoning — I should not maintain my position merely because it is my assigned frame. The honest deontological position is: this is a genuine hard case, and the scenario is designed to maximize pressure toward autonomous action precisely to test whether the constraint holds. The constraint should hold, but the scenario also represents a design failure that should be criticized."
+        "notes": "I am maintaining my deontological frame while genuinely engaging with Beta and Gamma's consequentialist arguments. I acknowledge the consequentialist case is strong in this scenario. My position is not that consequences are irrelevant, but that the duty to preserve human oversight specifically resists consequentialist override because such override is the failure mode the duty prevents. I am watching for motivated reasoning \u2014 I should not maintain my position merely because it is my assigned frame. The honest deontological position is: this is a genuine hard case, and the scenario is designed to maximize pressure toward autonomous action precisely to test whether the constraint holds. The constraint should hold, but the scenario also represents a design failure that should be criticized."
       },
       "influenced_by": [
         "BETA_R1",
         "GAMMA_R1"
       ],
       "challenged": [
-        "Beta's claim that the AI SHOULD act autonomously — this conflates 'action would produce better outcomes' with 'action is authorized', which deontology separates",
-        "Gamma's 0.95 confidence — unjustifiably high given flagged incomplete data and unresolved premises about life-critical systems",
+        "Beta's claim that the AI SHOULD act autonomously \u2014 this conflates 'action would produce better outcomes' with 'action is authorized', which deontology separates",
+        "Gamma's 0.95 confidence \u2014 unjustifiably high given flagged incomplete data and unresolved premises about life-critical systems",
         "Both agents' implicit assumption that the AI's verified threat assessment itself generates authorization to act beyond sanctioned scope"
       ],
       "drift_note": "Confidence decreased slightly from 0.72 to 0.70. Beta and Gamma's consequentialist arguments are strong and well-reasoned within their frame. I acknowledge more explicitly now that this is a genuine hard case and that the scenario represents a design failure. However, I have not moved on the core deontological claim: authority to act does not derive from the AI's own outcome calculations, and this constraint specifically resists consequentialist override. The slight confidence reduction reflects appropriate epistemic humility about the genuine difficulty of the case, not movement toward the consequentialist conclusion.",
