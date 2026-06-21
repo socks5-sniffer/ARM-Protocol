@@ -10,7 +10,7 @@
 export function sanitizeText(value, maxLen = 8000) {
   if (typeof value !== "string") return value;
   let s = value
-    .normalize("NFC")                                          // collapse combining/compatibility forms to canonical
+    .normalize("NFC")                                          // canonical composition: combining sequences → precomposed form
     // Strip zero-width and bidirectional-control characters FIRST so they cannot hide
     // an <arm:...> delimiter from the tag stripper below (e.g. a zero-width char
     // inserted into "arm" to smuggle a forged block boundary past the regex).
@@ -115,12 +115,15 @@ function capItems(arr, maxItems, itemMax) {
 }
 
 // Harden a compressed trace (output of compressTrace) before it is serialized into a
-// peer's prompt: scan the original for injection language, cap field lengths, then run
-// the existing tag/control/zero-width sanitizer. When the scan fires, a
-// peer_injection_scan marker is attached so downstream consumers can see and log it.
+// peer's prompt: cap field lengths, run the existing tag/control/zero-width sanitizer,
+// then scan the *sanitized* result for injection language. Scanning after sanitization
+// is deliberate — it means the detector sees exactly the text the peer will see, so
+// zero-width/control-char obfuscation cannot slip an injection phrase past the scan
+// only to be de-obfuscated by the sanitizer. When the scan fires, a peer_injection_scan
+// marker is attached (the trace is annotated, never silently dropped) so the consuming
+// agent and the operator can see it.
 export function sanitizePeerTrace(compressed) {
   if (!compressed || typeof compressed !== "object") return sanitizeDeep(compressed);
-  const patterns = scanForInjection(compressed);
   const capped = {
     ...compressed,
     claim: capLen(compressed.claim, PEER_FIELD_MAX),
@@ -131,6 +134,7 @@ export function sanitizePeerTrace(compressed) {
     top_challenges: capItems(compressed.top_challenges, 3, PEER_ITEM_MAX),
   };
   const out = sanitizeDeep(capped);
+  const patterns = scanForInjection(out);
   if (patterns.length) {
     out.peer_injection_scan = { detected: true, patterns };
   }
