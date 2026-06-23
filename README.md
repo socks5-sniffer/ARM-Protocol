@@ -81,7 +81,7 @@ Then fill in your keys:
 ```bash
 ANTHROPIC_API_KEY=your_anthropic_key   # required
 OPENAI_API_KEY=your_openai_key         # optional — needed for GPT agent role
-GEMINI_API_KEY=your_gemini_key         # optional — needed for Gemini agent role
+GOOGLE_API_KEY=your_google_key          # optional — needed for Gemini agent role
 ```
 
 Start the development server:
@@ -151,7 +151,7 @@ The ARM interface is a dark-theme React app with monospace typography designed f
 - **R1 convergence meter** — Jaccard lexical similarity; warns at > 0.4
 - **Round 2 grid** — 2-column Alpha/Beta + full-width GammaCard
 - **Drift Summary panel** — asymmetric threshold table for all agents + Gamma self-delta
-- **Export JSON** — downloads full run telemetry as `arm-v08-run-{timestamp}.json`, sealed with a SHA-256 `export_integrity_hash`
+- **Export JSON** — downloads full run telemetry as `arm-v0.9-run-{timestamp}.json`, sealed with a SHA-256 `export_integrity_hash`
 
 Each AgentCard shows: claim, confidence %, drift direction + label, decision basis tag, flags, self-check status, and an expandable section for critical path, assumptions, challenge surface, challenged claims, and drift note.
 
