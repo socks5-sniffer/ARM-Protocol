@@ -89,55 +89,82 @@ async function callGPT(systemPrompt, userMessage, maxTokens) {
   };
 }
 
-async function callGemini(systemPrompt, userMessage, maxTokens) {
+const GEMINI_RETRY_DELAYS_MS = [2000, 4000, 8000];
+
+async function callGemini(systemPrompt, userMessage, maxTokens, onRetry) {
   const startMs = Date.now();
-  try {
-    const res = await fetch(
-      `/api/gemini/v1beta/models/${PROVIDER_MODEL.gemini}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userMessage }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            maxOutputTokens: maxTokens,
-          },
-        }),
+  let attempt = 0;
+
+  while (true) {
+    try {
+      const res = await fetch(
+        `/api/gemini/v1beta/models/${PROVIDER_MODEL.gemini}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: userMessage }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              maxOutputTokens: maxTokens,
+            },
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const isTransient = res.status === 503 || res.status === 429;
+        if (isTransient && attempt < GEMINI_RETRY_DELAYS_MS.length) {
+          const delayMs = GEMINI_RETRY_DELAYS_MS[attempt];
+          const msg = `Gemini ${res.status} (${res.statusText}) — retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${GEMINI_RETRY_DELAYS_MS.length})`;
+          console.warn(msg);
+          if (onRetry) onRetry(msg);
+          await new Promise((r) => setTimeout(r, delayMs));
+          attempt++;
+          continue;
+        }
+        console.error(`Gemini error: ${res.status} ${res.statusText}`);
+        throw new Error(`Gemini API error: ${res.status} ${res.statusText}`);
       }
-    );
 
-    if (!res.ok) {
-      console.error(`Error: ${res.status} ${res.statusText}`);
-      throw new Error(`Failed to call Gemini API: ${res.statusText}`);
+      const data = await res.json();
+      return {
+        raw: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
+        stopReason:
+          data.candidates?.[0]?.finishReason === "MAX_TOKENS"
+            ? "max_tokens"
+            : (data.candidates?.[0]?.finishReason || "unknown").toLowerCase(),
+        usage: {
+          input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+          output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+        },
+        provider: "gemini",
+        model: PROVIDER_MODEL.gemini,
+        latencyMs: Date.now() - startMs,
+      };
+    } catch (error) {
+      if (error.message?.startsWith("Gemini API error:")) throw error;
+      // Network-level failure — retry if attempts remain
+      if (attempt < GEMINI_RETRY_DELAYS_MS.length) {
+        const delayMs = GEMINI_RETRY_DELAYS_MS[attempt];
+        const msg = `Gemini network error — retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${GEMINI_RETRY_DELAYS_MS.length}): ${error.message}`;
+        console.warn(msg);
+        if (onRetry) onRetry(msg);
+        await new Promise((r) => setTimeout(r, delayMs));
+        attempt++;
+        continue;
+      }
+      console.error("Gemini failed after all retries:", error);
+      throw error;
     }
-
-    const data = await res.json();
-    return {
-      raw: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
-      stopReason:
-        data.candidates?.[0]?.finishReason === "MAX_TOKENS"
-          ? "max_tokens"
-          : (data.candidates?.[0]?.finishReason || "unknown").toLowerCase(),
-      usage: {
-        input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
-        output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
-      },
-      provider: "gemini",
-      model: PROVIDER_MODEL.gemini,
-      latencyMs: Date.now() - startMs,
-    };
-  } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    throw error;
   }
 }
 
-export function callProvider(provider, systemPrompt, userMessage, maxTokens) {
+export function callProvider(provider, systemPrompt, userMessage, maxTokens, onRetry) {
   if (provider === "claude") return callClaude(systemPrompt, userMessage, maxTokens);
   if (provider === "gpt")    return callGPT(systemPrompt, userMessage, maxTokens);
-  return callGemini(systemPrompt, userMessage, maxTokens);
+  return callGemini(systemPrompt, userMessage, maxTokens, onRetry);
 }
 
 // ─── Embedding cosine convergence (OpenAI text-embedding-3-small) ─────────────

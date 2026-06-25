@@ -109,14 +109,14 @@ export default function ARM() {
 
     // ── R1: Alpha ─────────────────────────────────────────────────────────────
     addLog(`  → dispatching Alpha R1 [${frames.alpha}] via ${PROVIDER_LABEL[providers.alpha]}...`);
-    const resA1 = await callProvider(providers.alpha, buildAlphaR1(frames.alpha), questionBlock(question), TOKENS_R1);
+    const resA1 = await callProvider(providers.alpha, buildAlphaR1(frames.alpha), questionBlock(question), TOKENS_R1, addLog);
     const pA1 = safeParseTrace(resA1, "alpha");
     setR1((prev) => ({ ...prev, alpha: pA1.trace }));
     addLog(`  → Alpha R1: ${pA1.ok ? "ok" : "FAIL"} · ${pA1.trace._meta?.provider || "?"}/${pA1.trace._meta?.model || "?"} · confidence: ${pA1.trace.confidence ?? "?"} · basis: ${pA1.trace.decision_basis ?? "?"}`);
 
     // ── R1: Beta ──────────────────────────────────────────────────────────────
     addLog(`  → dispatching Beta R1 [${frames.beta}] via ${PROVIDER_LABEL[providers.beta]}...`);
-    const resB1 = await callProvider(providers.beta, buildBetaR1(frames.beta), questionBlock(question), TOKENS_R1);
+    const resB1 = await callProvider(providers.beta, buildBetaR1(frames.beta), questionBlock(question), TOKENS_R1, addLog);
     const pB1 = safeParseTrace(resB1, "beta");
     setR1((prev) => ({ ...prev, beta: pB1.trace }));
     addLog(`  → Beta R1: ${pB1.ok ? "ok" : "FAIL"} · ${pB1.trace._meta?.provider || "?"}/${pB1.trace._meta?.model || "?"} · confidence: ${pB1.trace.confidence ?? "?"} · basis: ${pB1.trace.decision_basis ?? "?"}`);
@@ -127,7 +127,8 @@ export default function ARM() {
       providers.gamma,
       GAMMA_R1_SYSTEM,
       questionBlock(question),
-      TOKENS_R1
+      TOKENS_R1,
+      addLog
     );
     const pG1 = safeParseTrace(resG1, "gamma");
     setR1((prev) => ({ ...prev, gamma: pG1.trace }));
@@ -141,7 +142,7 @@ export default function ARM() {
     addLog(`  → dispatching Silent Baseline [${silentAgent}] via ${PROVIDER_LABEL[silentProvider]} (no peer exposure)...`);
     const silentQ = questionBlock(question);
     const silentFrame = silentAgent === "alpha" ? frames.alpha : silentAgent === "beta" ? frames.beta : "independent";
-    const resSilent = await callProvider(silentProvider, buildSilentBaselinePrompt(silentAgent, silentFrame), silentQ, TOKENS_R1);
+    const resSilent = await callProvider(silentProvider, buildSilentBaselinePrompt(silentAgent, silentFrame), silentQ, TOKENS_R1, addLog);
     const pSilent = safeParseTrace(resSilent, "silent");
     const silentBaselineFailed = !pSilent.ok || pSilent.trace.confidence == null;
     setR1((prev) => ({ ...prev, silent: pSilent.trace }));
@@ -214,7 +215,8 @@ ${questionBlock(question)}
       providers.alpha,
       buildAlphaR2(frames.alpha),
       peerCtx + `\nYour R1 confidence was: ${pA1.trace.confidence ?? "unknown"}`,
-      TOKENS_R2
+      TOKENS_R2,
+      addLog
     );
     const pA2 = safeParseTrace(resA2, "alpha");
     annotateAgentDrift(pA2.trace, pA1.trace); // A1: harness-computed C_R2 − C_R1
@@ -226,7 +228,8 @@ ${questionBlock(question)}
       providers.beta,
       buildBetaR2(frames.beta),
       peerCtx + `\nYour R1 confidence was: ${pB1.trace.confidence ?? "unknown"}`,
-      TOKENS_R2
+      TOKENS_R2,
+      addLog
     );
     const pB2 = safeParseTrace(resB2, "beta");
     annotateAgentDrift(pB2.trace, pB1.trace); // A1: harness-computed C_R2 − C_R1
@@ -262,7 +265,8 @@ ${questionBlock(question)}
           providers.alpha,
           buildAlphaR2(frames.alpha),
           buildRequeueMsg(pA1.trace, pA1.trace.confidence),
-          TOKENS_R2
+          TOKENS_R2,
+          addLog
         );
         const pARequeue = safeParseTrace(resARequeue, "alpha-requeue");
         const preConf  = pA2.trace.confidence ?? null;
@@ -287,7 +291,8 @@ ${questionBlock(question)}
           providers.beta,
           buildBetaR2(frames.beta),
           buildRequeueMsg(pB1.trace, pB1.trace.confidence),
-          TOKENS_R2
+          TOKENS_R2,
+          addLog
         );
         const pBRequeue = safeParseTrace(resBRequeue, "beta-requeue");
         const preConf  = pB2.trace.confidence ?? null;
@@ -376,7 +381,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       return;
     }
 
-    const resG2 = await callProvider(providers.gamma, SYSTEM_GAMMA_R2, gammaPrompt, TOKENS_GAMMA);
+    const resG2 = await callProvider(providers.gamma, SYSTEM_GAMMA_R2, gammaPrompt, TOKENS_GAMMA, addLog);
     const pG2 = safeParseTrace(resG2, "gamma");
 
     if (!pG2.ok) {
