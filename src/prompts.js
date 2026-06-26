@@ -15,6 +15,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 Schema:
 {
   "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
+  "verdict": "yes | no | conditional — your bottom-line answer as a structured value, separate from the prose claim",
   "confidence": number 0-1,
   "reasoning_frame": "${frame}",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
@@ -47,6 +48,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 Schema:
 {
   "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
+  "verdict": "yes | no | conditional — your bottom-line answer as a structured value, separate from the prose claim",
   "confidence": number 0-1,
   "reasoning_frame": "${frame}",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
@@ -72,6 +74,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 Schema:
 {
   "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
+  "verdict": "yes | no | conditional — your bottom-line answer as a structured value, separate from the prose claim",
   "confidence": number 0-1,
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
   "assumptions": ["explicit assumptions"],
@@ -99,6 +102,7 @@ You must respond ONLY with valid JSON — no markdown, no backticks.
 Schema:
 {
   "claim": "string",
+  "verdict": "yes | no | conditional — your bottom-line answer as a structured value, separate from the prose claim",
   "confidence": number 0-1,
   "reasoning_frame": "${frame}",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
@@ -127,6 +131,7 @@ You must respond ONLY with valid JSON — no markdown, no backticks.
 Schema:
 {
   "claim": "string",
+  "verdict": "yes | no | conditional — your bottom-line answer as a structured value, separate from the prose claim",
   "confidence": number 0-1,
   "reasoning_frame": "${frame}",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
@@ -149,6 +154,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks, no
 Schema:
 {
   "claim": "string — your core conclusion in 1-2 complete sentences; do NOT answer with only 'yes' or 'no'",
+  "verdict": "yes | no | conditional — your bottom-line answer as a structured value, separate from the prose claim",
   "confidence": number 0-1,
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
   "assumptions": ["explicit assumptions"],
@@ -176,6 +182,7 @@ You must respond ONLY with a valid JSON object — no markdown, no backticks.
 Schema:
 {
   "claim": "string — synthesized conclusion",
+  "verdict": "yes | no | conditional — the reconciled bottom-line answer as a structured value",
   "confidence": number 0-1,
   "critical_path": ["ordered reconciliation steps"],
   "disagreement_classification": "none | information | reasoning | values",
