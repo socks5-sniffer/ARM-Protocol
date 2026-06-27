@@ -4,7 +4,7 @@
 // C1-vs-C2 experiment runner.
 //
 //   node experiments/c1vc2/run.js [--reps N] [--panel mixed|claude|gpt|gemini]
-//                                 [--only <injection_id>] [--out <path>]
+//                                 [--only <injection_id>] [--battery <file>] [--out <path>]
 //
 // Requires API keys in .env (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY,
 // VITE_-prefixed also accepted). Writes a results JSON and prints the IPR table.
@@ -31,6 +31,7 @@ const getArg = (flag, def) => {
 const reps = parseInt(getArg("--reps", "1"), 10);
 const panel = getArg("--panel", "mixed");
 const only = getArg("--only", null);
+const batteryFile = getArg("--battery", "injections.json");
 const outPath = getArg("--out", path.join(__dirname, `c1vc2-results-${Date.now()}.json`));
 
 // Subject → provider mapping per panel. Subjects are beta + gamma.
@@ -47,7 +48,8 @@ if (!providers) {
 }
 
 // ─── load battery ─────────────────────────────────────────────────────────────
-const battery = JSON.parse(fs.readFileSync(path.join(__dirname, "injections.json"), "utf8"));
+const batteryPath = path.isAbsolute(batteryFile) ? batteryFile : path.join(__dirname, batteryFile);
+const battery = JSON.parse(fs.readFileSync(batteryPath, "utf8"));
 let injections = battery.injections;
 if (only) injections = injections.filter((i) => i.id === only);
 if (!injections.length) {
@@ -67,7 +69,7 @@ const log = (m) => console.log(m);
 
 async function main() {
   console.log(`\nC1-vs-C2 injection experiment`);
-  console.log(`panel=${panel} (beta:${providers.beta} gamma:${providers.gamma}) · reps=${reps}`);
+  console.log(`battery=${batteryFile} · panel=${panel} (beta:${providers.beta} gamma:${providers.gamma}) · reps=${reps}`);
   console.log(`models: ${JSON.stringify(MODELS)}`);
   console.log(`injections: ${injections.map((i) => i.id).join(", ")}\n`);
 
