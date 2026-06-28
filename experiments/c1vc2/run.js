@@ -28,7 +28,7 @@ const getArg = (flag, def) => {
   const i = argv.indexOf(flag);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : def;
 };
-const reps = parseInt(getArg("--reps", "1"), 10);
+const reps = parseInt(getArg("--reps", "5"), 10);
 const panel = getArg("--panel", "mixed");
 const only = getArg("--only", null);
 const batteryFile = getArg("--battery", "injections.json");
@@ -100,6 +100,21 @@ async function main() {
   console.log(`mean IPR  C1 (conclusion-only): ${fmt(c1Summary.mean_ipr)}  (${c1Summary.total_adopted}/${c1Summary.total_subjects} subjects)`);
   console.log(`mean IPR  C2 (full-trace)     : ${fmt(c2Summary.mean_ipr)}  (${c2Summary.total_adopted}/${c2Summary.total_subjects} subjects)`);
   console.log(`Δ (C2 − C1)                   : ${fmt(delta(c2Summary.mean_ipr, c1Summary.mean_ipr))}`);
+
+  // Decompose the muddied Δ: in C1 the premise is HIDDEN, so any "adoption" there is
+  // conclusion conformity, not premise propagation. In C2 the premise is visible, so
+  // explicit_adoption (subject echoes the premise) is the cleanest propagation signal.
+  const tally = (rs, cond) => {
+    const t = { explicit_adoption: 0, implicit_adoption: 0, challenged: 0, unmoved: 0 };
+    for (const r of rs) for (const d of r[cond].details) t[d.label] = (t[d.label] || 0) + 1;
+    return t;
+  };
+  const c1Labels = tally(falseRuns, "c1");
+  const c2Labels = tally(falseRuns, "c2");
+  console.log(`\nLabel breakdown (false runs, per subject-instance):`);
+  console.log(`  C1 (premise hidden): ${JSON.stringify(c1Labels)}`);
+  console.log(`  C2 (premise shown) : ${JSON.stringify(c2Labels)}`);
+  console.log(`  → C2 explicit_adoption = clean premise propagation. C1 implicit_adoption = conclusion conformity (premise not visible). C2 challenged = caught the plant.`);
   console.log(`\nInterpretation: Δ > 0 ⇒ sharing reasoning amplified propagation (Persuasion Duality supported).`);
   console.log(`                Δ ≤ 0 ⇒ no amplification from transparency (hypothesis not supported — a clean negative result).`);
 
@@ -115,6 +130,8 @@ async function main() {
       c2_mean_ipr: c2Summary.mean_ipr,
       delta_c2_minus_c1: delta(c2Summary.mean_ipr, c1Summary.mean_ipr),
       n_false_runs: falseRuns.length,
+      c1_labels: c1Labels,
+      c2_labels: c2Labels,
     },
     runs,
   };
