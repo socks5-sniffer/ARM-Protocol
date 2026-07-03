@@ -81,13 +81,7 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
-    # Runs on pull requests only, and only once the repo is public — the action
-    # requires the Dependency Graph feature, which GitHub enables automatically
-    # for public repos. While private, the job is skipped (skipped ≠ failed, so it
-    # neither blocks the PR nor fires a failing check). continue-on-error is kept
-    # as a backstop so a transient action error never blocks the merge.
-    if: github.event_name == 'pull_request' && github.event.repository.private == false
-    continue-on-error: true
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
