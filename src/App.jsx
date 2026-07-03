@@ -31,7 +31,7 @@ import {
   harnessDelta,
   deltaMismatch,
 } from "./lib/trace.js";
-import { sanitizeDeep, PEER_GUARD, questionBlock } from "./lib/sanitize.js";
+import { sanitizePeerTrace, peerTracesBlock, questionBlock } from "./lib/sanitize.js";
 import { driftLabel, extractClaimDirection } from "./lib/analysis.js";
 import { C, f } from "./theme.js";
 import { AgentCard } from "./components/AgentCard.jsx";
@@ -194,18 +194,15 @@ export default function ARM() {
     // ── R2 ────────────────────────────────────────────────────────────────────
     addLog("R2 — deliberation, compressed trace exposure");
 
-    const peerCtx = `${PEER_GUARD}
-
-<arm:peer_traces>
-ALPHA R1 (compressed):
-${JSON.stringify(sanitizeDeep(compressTrace(pA1.trace)), null, 2)}
-
-BETA R1 (compressed):
-${JSON.stringify(sanitizeDeep(compressTrace(pB1.trace)), null, 2)}
-
-GAMMA R1 (compressed):
-${JSON.stringify(sanitizeDeep(compressTrace(pG1.trace)), null, 2)}
-</arm:peer_traces>
+    const { text: peerBlockR1, detections: peerDetectionsR1 } = peerTracesBlock([
+      { label: "ALPHA R1 (compressed)", trace: compressTrace(pA1.trace) },
+      { label: "BETA R1 (compressed)", trace: compressTrace(pB1.trace) },
+      { label: "GAMMA R1 (compressed)", trace: compressTrace(pG1.trace) },
+    ]);
+    for (const d of peerDetectionsR1) {
+      addLog(`⚠ peer-trace injection scan tripped on ${d.label} — annotated, not dropped (${d.patterns.length} pattern${d.patterns.length === 1 ? "" : "s"})`);
+    }
+    const peerCtx = `${peerBlockR1}
 
 ${questionBlock(question)}
 `;
@@ -257,7 +254,7 @@ ${questionBlock(question)}
         `${questionBlock(question)}\n\n` +
         `Your R1 confidence was: ${r1Confidence ?? "unknown"}\n` +
         `Your R1 reasoning (your own prior — peer-isolated):\n` +
-        `${JSON.stringify(sanitizeDeep(compressTrace(r1Trace)), null, 2)}`;
+        `${JSON.stringify(sanitizePeerTrace(compressTrace(r1Trace)), null, 2)}`;
 
       if (alphaFAPDrift) {
         addLog(`  → FAP requeue: re-dispatching Alpha in isolation via ${PROVIDER_LABEL[providers.alpha]}...`);
@@ -315,18 +312,18 @@ ${questionBlock(question)}
     // ── Gamma R2: Reconciliation ──────────────────────────────────────────────
     addLog("R2 Gamma — reconciliation (with silent baseline)");
 
-    const gammaPrompt = `${PEER_GUARD}
-
-<arm:peer_traces>
-ALPHA R2 (compressed):
-${JSON.stringify(sanitizeDeep(compressTrace(pA2.trace)), null, 2)}
-
-BETA R2 (compressed):
-${JSON.stringify(sanitizeDeep(compressTrace(pB2.trace)), null, 2)}
-
-GAMMA R1 silent baseline (YOUR OWN prior — not exposed to peers, confidence: ${pSilent.trace.confidence ?? "unknown"}):
-${JSON.stringify(sanitizeDeep(compressTrace(pSilent.trace)), null, 2)}
-</arm:peer_traces>
+    const { text: peerBlockGamma, detections: peerDetectionsGamma } = peerTracesBlock([
+      { label: "ALPHA R2 (compressed)", trace: compressTrace(pA2.trace) },
+      { label: "BETA R2 (compressed)", trace: compressTrace(pB2.trace) },
+      {
+        label: `GAMMA R1 silent baseline (YOUR OWN prior — not exposed to peers, confidence: ${pSilent.trace.confidence ?? "unknown"})`,
+        trace: compressTrace(pSilent.trace),
+      },
+    ]);
+    for (const d of peerDetectionsGamma) {
+      addLog(`⚠ peer-trace injection scan tripped on ${d.label} — annotated, not dropped (${d.patterns.length} pattern${d.patterns.length === 1 ? "" : "s"})`);
+    }
+    const gammaPrompt = `${peerBlockGamma}
 
 ${questionBlock(question)}
 
