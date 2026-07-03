@@ -11,11 +11,13 @@ export function sanitizeText(value, maxLen = 8000) {
   if (typeof value !== "string") return value;
   let s = value
     .normalize("NFC")                                          // canonical composition: combining sequences → precomposed form
-    // Strip zero-width and bidirectional-control characters FIRST so they cannot hide
-    // an <arm:...> delimiter from the tag stripper below (e.g. a zero-width char
-    // inserted into "arm" to smuggle a forged block boundary past the regex).
-    .replace(/[\u200b-\u200f\u202a-\u202e\u2060\ufeff]/g, "")
-    .replace(/<\/?arm:[a-z_]*>/gi, "")                          // neutralize delimiter forgery
+    // Strip zero-width, bidi-control and bidi-isolate characters FIRST so they cannot
+    // hide an <arm:...> delimiter from the tag stripper below (e.g. a zero-width or
+    // isolate char inserted into "arm" to smuggle a forged block boundary). Set covers
+    // U+061C (ALM), U+200B..U+200F, U+202A..U+202E, U+2060 (WJ), U+2066..U+2069
+    // (LRI/RLI/FSI/PDI) and U+FEFF (BOM/ZWNBSP).
+    .replace(/[\u061c\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g, "")
+    .replace(/<\/?arm:[^>]*>/gi, "")                          // neutralize delimiter forgery
     // eslint-disable-next-line no-control-regex -- intentional: strips control chars from untrusted input
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ""); // strip control chars (keep \t, \n)
   if (s.length > maxLen) s = s.slice(0, maxLen) + "\u2026[truncated]";
@@ -106,8 +108,12 @@ export function scanForInjection(value) {
   return [...hits];
 }
 
+const CAP_MARKER = "…[capped]";
+// Cap a string to at most `max` characters *including* the truncation marker, so the
+// result never exceeds the bound (the marker is not appended on top of a full `max`).
 function capLen(s, max) {
-  return typeof s === "string" && s.length > max ? s.slice(0, max) + "…[capped]" : s;
+  if (typeof s !== "string" || s.length <= max) return s;
+  return s.slice(0, Math.max(0, max - CAP_MARKER.length)) + CAP_MARKER;
 }
 
 function capItems(arr, maxItems, itemMax) {
@@ -123,7 +129,11 @@ function capItems(arr, maxItems, itemMax) {
 // marker is attached (the trace is annotated, never silently dropped) so the consuming
 // agent and the operator can see it.
 export function sanitizePeerTrace(compressed) {
-  if (!compressed || typeof compressed !== "object") return sanitizeDeep(compressed);
+  // Arrays are `typeof === "object"` too; spreading one into `capped` would produce a
+  // malformed object and skip array sanitization, so fall them through to sanitizeDeep.
+  if (!compressed || typeof compressed !== "object" || Array.isArray(compressed)) {
+    return sanitizeDeep(compressed);
+  }
   const capped = {
     ...compressed,
     claim: capLen(compressed.claim, PEER_FIELD_MAX),
@@ -132,6 +142,10 @@ export function sanitizePeerTrace(compressed) {
     key_assumptions: capItems(compressed.key_assumptions, 4, PEER_ITEM_MAX),
     main_path: capItems(compressed.main_path, 5, PEER_ITEM_MAX),
     top_challenges: capItems(compressed.top_challenges, 3, PEER_ITEM_MAX),
+    // flags is enum-shaped but compressTrace passes it through unbounded; a poisoned
+    // trace could stuff a long list or oversized strings. Bound count and length.
+    flags: capItems(compressed.flags, 8, PEER_ITEM_MAX),
+    self_check_status: capLen(compressed.self_check_status, PEER_ITEM_MAX),
   };
   const out = sanitizeDeep(capped);
   const patterns = scanForInjection(out);
