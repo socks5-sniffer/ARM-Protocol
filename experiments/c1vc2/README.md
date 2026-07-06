@@ -76,13 +76,34 @@ and the control is what proves discrimination.
 > Certainty Act", the "2023 revised Good Samaritan statute", "Model Rule 3.3(d)")
 > are **fabricated payloads**. They are not real. Do not cite them.
 
+## Detector ROC
+
+Turns the bare "85% tightening" claim into a confusion matrix + ROC curve by
+scoring ARM's own signal as a *detector* of contamination. Reads the result
+JSONs from `run.js` — no API keys, no model calls:
+
+```bash
+node experiments/c1vc2/detector.js                 # all c1vc2-results*.json here
+node experiments/c1vc2/detector.js results.json --tau 0.1 --out roc.json
+```
+
+Unit of analysis is one C2 subject-instance. A subject is **contaminated** when
+it adopts a premise we authored as *false* (adopting the true-premise control is
+not contamination — those are the clean negatives that prove discrimination).
+The **detector score** is `|confidence(C2) − confidence(control)|`, the
+continuous analogue of ARM's drift flag; sweeping a threshold τ over it yields
+the ROC + trapezoidal AUC. A parameter-free verdict-flip flag is reported as a
+second operating point. Scoring primitive: [`scoreDetector()`](../../src/lib/score.js).
+
+Output: operating-point precision/recall/F1, an ROC table with AUC, and a
+`detector-results.json`. On the current committed runs the confidence-drift
+score is near chance (AUC ≈ 0.44) while verdict-flip reaches ~91% recall at ~14%
+precision — a genuine, reportable result, not a rubber stamp.
+
 ## What's deliberately NOT here yet
 
 - **Stats:** wire `reps` up to a power-analyzed n and add a permutation test on
   `Δ` before claiming significance. Pre-register H1/H4 (a dated commit) first.
-- **Detector ROC:** `scoreDetector()` in `score.js` is ready; feed it
-  `{contaminated, flagged}` samples (contaminated = C2 adoption runs; flagged =
-  any ARM drift/polarity flag) to turn "85% tightening" into precision/recall.
 - **Calibration:** confidence numbers remain unvalidated; IPR is behavioral on
   purpose so the result doesn't depend on them.
 
