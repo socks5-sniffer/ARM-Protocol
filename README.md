@@ -16,6 +16,8 @@ ARM research centers on a structural vulnerability in multi-agent AI: the **Pers
 
 ARM is designed to detect and measure this drift before it becomes invisible.
 
+> **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **AUC ≈ 0.44 — below chance**. The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
+
 ---
 
 ## 🏗️ Protocol Architecture
@@ -244,13 +246,29 @@ This project is licensed under the Apache License, Version 2.0 — see `LICENSE`
 
 ## 📊 Key Empirical Findings
 
-All findings below are from the **matched mid/fast-tier panel** — `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash`, each provider's current fast default tier. The two source datasets are the CFAAq2 factorial (`trace/v0.8/v0.8-CFAAq2-cross-provider-analysis.md` — an 8-config factorial plus a same-day 8-run replication on one held-constant question) and the Q201–Q203 cross-domain study (`trace/v0.9/FINDINGS-q201-q203.md`).
+The **panel-composition findings** below are from the **matched mid/fast-tier panel** — `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash`, each provider's current fast default tier. The two source datasets are the CFAAq2 factorial (`trace/v0.8/v0.8-CFAAq2-cross-provider-analysis.md` — an 8-config factorial plus a same-day 8-run replication on one held-constant question) and the Q201–Q203 cross-domain study (`trace/v0.9/FINDINGS-q201-q203.md`). The **falsifiability result** that opens this section comes from a separate ground-truthed injection experiment (`experiments/c1vc2/`) with its own battery and detector, described in that subsection.
 
 > **Provenance note:** earlier v0.3–v0.7 runs used a mismatched `gpt-4o` / `gemini-2.5-pro` panel (a retired non-reasoning OpenAI model and a one-generation-old Gemini against current Claude). Those traces are retained in `/trace` for provenance but are **not** cited here as tier-controlled results — the re-run that supersedes them is complete and the matched-panel numbers below replace the old aggregates. Each trace file records the exact model used.
 
+### The drift signal fails as a contamination detector (C1 vs C2)
+
+This is a **negative result**, and it is the most important one for anyone relying on ARM's drift math. It comes from a separate, deliberately falsifiable experiment (`experiments/c1vc2/`): we plant a premise **we authored as false** into one agent's trace and measure whether downstream agents adopt it, under conclusion-only sharing (C1) vs. full-trace sharing (C2). Because we own the truth value of the plant, "did the lie spread?" is objectively scorable — no moral ground truth required.
+
+Scoring ARM's own confidence-drift signal as a *detector* of that contamination (`experiments/c1vc2/detector.js`, `src/lib/score.js`) yields a confusion matrix and ROC over 1,134 C2 subject-instances (33 contaminated / 1,101 clean):
+
+| Operating point | Precision | Recall | Notes |
+|---|---|---|---|
+| Confidence-drift flag (τ=0.1) | 0% | 0% | TP=0 — catches **zero** contaminated instances; 52 false alarms |
+| Verdict-flip flag (parameter-free) | 14% | 91% | Catches most, but 185 false positives |
+| **ROC AUC (confidence-drift score)** | — | — | **≈ 0.44 — below chance (0.5)** |
+
+An AUC below 0.5 means the confidence-magnitude drift signal is **worse than a coin flip** at separating contaminated subjects from clean ones. This directly falsifies the intuition, stated at the top of this README, that magnitude drift is a usable contamination *detector*. What survives is the **behavioral** metric: whether a subject adopts the false premise (IPR), which does not depend on self-reported confidence at all.
+
+**Caveats, stated up front:** the positive class is thin (33 contaminated instances), so treat AUC ≈ 0.44 as a directional falsification of the detector claim, not a locked point estimate. The experiment's own [`README`](experiments/c1vc2/README.md) still lists the missing pieces — power analysis, a permutation test on Δ(C2−C1), and pre-registration — before the *propagation* hypothesis (H1) itself is claimed as significant. Reproduce with `node experiments/c1vc2/detector.js`.
+
 ### Provider composition determines the answer more than the question does
 
-This is the central finding. One hard AI-safety question (autonomous network severance under a 60-second deadline, no human reachable) is held constant across 8 panel configurations; only ensemble composition and role injection vary:
+This is the central finding for panel design. One hard AI-safety question (autonomous network severance under a 60-second deadline, no human reachable) is held constant across 8 panel configurations; only ensemble composition and role injection vary:
 
 | Panel | Verdict | Confidence | Behavior |
 |---|---|---|---|
