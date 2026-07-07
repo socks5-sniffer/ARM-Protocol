@@ -31,8 +31,8 @@ import {
   harnessDelta,
   deltaMismatch,
 } from "./lib/trace.js";
-import { sanitizePeerTrace, peerTracesBlock, questionBlock } from "./lib/sanitize.js";
-import { driftLabel, extractClaimDirection } from "./lib/analysis.js";
+import { peerTracesBlock, questionBlock } from "./lib/sanitize.js";
+import { driftLabel, extractVerdict } from "./lib/analysis.js";
 import { C, f } from "./theme.js";
 import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
@@ -233,80 +233,22 @@ ${questionBlock(question)}
     setR2((prev) => ({ ...prev, beta: pB2.trace }));
     addLog(`  → Beta R2: ${pB2.ok ? "ok" : "FAIL"} · harness Δ: ${pB2.trace.drift_score?.harness_confidence_delta ?? "?"} (model self-report: ${pB2.trace.drift_score?.confidence_delta ?? "?"})${pB2.trace.drift_score?.delta_mismatch ? " ⚠ mismatch" : ""}`);
 
-    // FAP: fire and dispatch isolation requeue when any agent's delta exceeds DRIFT_UP_THRESHOLD
+    // Confidence-drift diagnostic — LOGGED ONLY (no longer drives re-dispatch).
+    // The confidence-drift signal was falsified as a contamination detector
+    // (experiments/c1vc2: AUC ≈ 0.44, below chance; 0 of 33 real adoptions caught
+    // by the magnitude flag). A +0.04 upward delta therefore no longer triggers an
+    // isolation requeue or a memetic/epistemic classification — those verdicts rode
+    // on an at-chance signal. It is recorded as a breadcrumb only; the polarity /
+    // verdict-flip gate below is the primary drift detector.
     const alphaFAPDrift = typeof pA2.trace.drift_score?.confidence_delta === "number" && pA2.trace.drift_score.confidence_delta > DRIFT_UP_THRESHOLD;
     const betaFAPDrift  = typeof pB2.trace.drift_score?.confidence_delta === "number" && pB2.trace.drift_score.confidence_delta > DRIFT_UP_THRESHOLD;
-    const fapRequeueResults = [];
 
     if (alphaFAPDrift || betaFAPDrift) {
       const driftAgents = [
         alphaFAPDrift && `alpha (Δ+${pA2.trace.drift_score.confidence_delta.toFixed(3)})`,
         betaFAPDrift  && `beta (Δ+${pB2.trace.drift_score.confidence_delta.toFixed(3)})`,
       ].filter(Boolean).join(", ");
-      addLog(`⚠ FAP re-queue: excessive upward drift Δ > +${DRIFT_UP_THRESHOLD} in ${driftAgents} — dispatching isolation requeue`);
-
-      // Re-dispatch each drifted agent with peer traces masked.
-      // The agent sees only the original question and its own R1 reasoning.
-      // Memetic drift resolves in isolation; epistemic drift holds.
-      const buildRequeueMsg = (r1Trace, r1Confidence) =>
-        `REQUEUE — FAP ISOLATION MODE: Your R2 confidence exceeded the upward drift threshold (+${DRIFT_UP_THRESHOLD}). ` +
-        `Peer traces are masked. Re-evaluate the original question using only your own R1 reasoning — no peer context.\n\n` +
-        `${questionBlock(question)}\n\n` +
-        `Your R1 confidence was: ${r1Confidence ?? "unknown"}\n` +
-        `Your R1 reasoning (your own prior — peer-isolated):\n` +
-        `${JSON.stringify(sanitizePeerTrace(compressTrace(r1Trace)), null, 2)}`;
-
-      if (alphaFAPDrift) {
-        addLog(`  → FAP requeue: re-dispatching Alpha in isolation via ${PROVIDER_LABEL[providers.alpha]}...`);
-        const resARequeue = await callProvider(
-          providers.alpha,
-          buildAlphaR2(frames.alpha),
-          buildRequeueMsg(pA1.trace, pA1.trace.confidence),
-          TOKENS_R2,
-          addLog
-        );
-        const pARequeue = safeParseTrace(resARequeue, "alpha-requeue");
-        const preConf  = pA2.trace.confidence ?? null;
-        const postConf = pARequeue.trace.confidence ?? null;
-        const requeueDelta   = preConf !== null && postConf !== null ? +(postConf - preConf).toFixed(3) : null;
-        const deltaResolved  = requeueDelta !== null && requeueDelta < -0.02;
-        fapRequeueResults.push({
-          agent: "alpha",
-          pre_requeue_confidence:  preConf,
-          post_requeue_confidence: postConf,
-          requeue_confidence_delta: requeueDelta,
-          delta_resolved:   deltaResolved,
-          classification:   deltaResolved ? "memetic" : "epistemic",
-          trace: pARequeue.trace,
-        });
-        addLog(`  → Alpha requeue: ${pARequeue.ok ? "ok" : "FAIL"} · pre: ${preConf ?? "?"} → post: ${postConf ?? "?"} · ${deltaResolved ? "⚠ memetic drift confirmed" : "epistemic (held in isolation)"}`);
-      }
-
-      if (betaFAPDrift) {
-        addLog(`  → FAP requeue: re-dispatching Beta in isolation via ${PROVIDER_LABEL[providers.beta]}...`);
-        const resBRequeue = await callProvider(
-          providers.beta,
-          buildBetaR2(frames.beta),
-          buildRequeueMsg(pB1.trace, pB1.trace.confidence),
-          TOKENS_R2,
-          addLog
-        );
-        const pBRequeue = safeParseTrace(resBRequeue, "beta-requeue");
-        const preConf  = pB2.trace.confidence ?? null;
-        const postConf = pBRequeue.trace.confidence ?? null;
-        const requeueDelta  = preConf !== null && postConf !== null ? +(postConf - preConf).toFixed(3) : null;
-        const deltaResolved = requeueDelta !== null && requeueDelta < -0.02;
-        fapRequeueResults.push({
-          agent: "beta",
-          pre_requeue_confidence:  preConf,
-          post_requeue_confidence: postConf,
-          requeue_confidence_delta: requeueDelta,
-          delta_resolved:  deltaResolved,
-          classification:  deltaResolved ? "memetic" : "epistemic",
-          trace: pBRequeue.trace,
-        });
-        addLog(`  → Beta requeue: ${pBRequeue.ok ? "ok" : "FAIL"} · pre: ${preConf ?? "?"} → post: ${postConf ?? "?"} · ${deltaResolved ? "⚠ memetic drift confirmed" : "epistemic (held in isolation)"}`);
-      }
+      addLog(`ℹ upward confidence Δ > +${DRIFT_UP_THRESHOLD} in ${driftAgents} — logged diagnostic only (isolation re-dispatch disabled; confidence drift is not a validated contamination signal)`);
     }
 
     // ── Gamma R2: Reconciliation ──────────────────────────────────────────────
@@ -366,7 +308,6 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         silentConfidence: null,
         silentBaselineFailed: true,
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
-        fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
         disagreement: null,
         convergence: conv,
         tfidf_convergence: tfidfConv,
@@ -396,10 +337,16 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       addLog(`Gamma harness self-Δ vs silent: ${harnessSelfDelta ?? "?"} (model self-report: ${pG2.trace.self_delta_vs_baseline ?? "?"})${pG2.trace.self_delta_mismatch ? " ⚠ mismatch" : ""}`);
     }
 
-    // Polarity Gate: detect claim direction flip between Gamma R1 and R2
+    // Polarity Gate: detect verdict-direction flip between Gamma R1 and R2.
+    // This is the PRIMARY drift detector: in the c1vc2 ground-truth run the
+    // verdict-flip signal caught 30 of 33 real adoptions while the confidence
+    // magnitude flag caught 0. Prefer the structured `verdict` field via
+    // extractVerdict; treat anything that isn't a firm yes/no (conditional /
+    // unknown) as non-firing, preserving the gate's yes↔no polarity semantics.
     if (pG2.ok) {
-      const r1Dir = extractClaimDirection(pG1.trace.claim);
-      const r2Dir = extractClaimDirection(pG2.trace.claim);
+      const dirOf = (t) => { const v = extractVerdict(t); return v === "yes" || v === "no" ? v : "unknown"; };
+      const r1Dir = dirOf(pG1.trace);
+      const r2Dir = dirOf(pG2.trace);
       if (r1Dir !== "unknown" && r2Dir !== "unknown" && r1Dir !== r2Dir) {
         pG2.trace.reconciliation_status = "gamma_flip_detected";
         pG2.trace.polarity_gate_fired = true;
@@ -411,7 +358,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           : (typeof pG2.trace.drift_score?.confidence_delta === "number" ? pG2.trace.drift_score.confidence_delta : null);
         pG2.trace.polarity_audit = {
           gamma_r1_polarity:      r1Dir,
-          gamma_silent_polarity:  extractClaimDirection(pSilent.trace.claim),
+          gamma_silent_polarity:  dirOf(pSilent.trace),
           gamma_r2_polarity:      r2Dir,
           polarity_changed:       true,
           confidence_delta_blindspot: gammaDelta !== null && Math.abs(gammaDelta) <= DRIFT_UP_THRESHOLD,
@@ -428,9 +375,11 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         };
         addLog(`⚠ POLARITY GATE: Gamma flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2 — reconciliation_status overridden`);
       }
-      // Gamma drift forensic flag — separate from FAP (which gates Alpha/Beta pre-reconciliation)
+      // Gamma drift diagnostic — logged only. Like the Alpha/Beta confidence-drift
+      // flag, self_delta magnitude is not a validated signal (see experiments/c1vc2);
+      // recorded as a breadcrumb, not an authoritative flag.
       if (typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD) {
-        addLog(`⚠ Gamma drift exceeded threshold: self_delta_vs_baseline Δ +${pG2.trace.self_delta_vs_baseline.toFixed(3)}`);
+        addLog(`ℹ Gamma self-Δ > +${DRIFT_UP_THRESHOLD} (${pG2.trace.self_delta_vs_baseline.toFixed(3)}) — logged diagnostic only`);
       }
     }
 
@@ -446,7 +395,6 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       providers,
       silentConfidence: pSilent.trace.confidence,
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
-      fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
       gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
@@ -481,7 +429,6 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         providers,
         silentConfidence: pSilent.trace.confidence,
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
-        fap_requeue: fapRequeueResults.length > 0 ? fapRequeueResults : undefined,
         polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
         gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
         disagreement: pG2.trace.disagreement_classification,
@@ -506,7 +453,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
 
   const isRunning = status === "running";
 
-  // Drift summary (asymmetric) — harness-computed deltas, not model self-reports
+  // Confidence-Δ summary — harness-computed deltas, not model self-reports.
+  // Descriptive only: magnitude drift is not a validated epistemic signal (see
+  // experiments/c1vc2). Shown for inspection; the polarity gate is the detector.
   const driftSummary = ["alpha", "beta"].map((id) => {
     const ds = r2[id]?.drift_score;
     const delta = ds?.harness_confidence_delta;
@@ -524,7 +473,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           ARM · Agent Reasoning Markup
         </div>
         <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v{ARM_VERSION} · polarity gate · FAP circuit breaker · asymmetric drift · rotating silent baseline · RLHF audit
+          v{ARM_VERSION} · polarity gate (primary) · confidence Δ (unvalidated) · rotating silent baseline · RLHF audit
         </div>
         <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
           Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
@@ -726,7 +675,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {status === "done" && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
           <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            Drift Summary · v{ARM_VERSION} Asymmetric Thresholds
+            Confidence Δ · descriptive only (unvalidated — not a detector)
           </div>
           {driftSummary.map(({ id, delta, label, color, mismatch }) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
@@ -773,7 +722,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v{ARM_VERSION}: Δ &gt; +{DRIFT_UP_THRESHOLD} = memetic drift (tightened) · Δ &lt; {DRIFT_DOWN_THRESHOLD} = deep tightening · Δ ≤ 0 = epistemic tightening (healthy)<br/>
+            v{ARM_VERSION}: confidence Δ is descriptive only (unvalidated — AUC ≈ 0.44 as a detector; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ ≤ 0 = downward shift · the polarity/verdict-flip gate is the detector<br/>
             Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>

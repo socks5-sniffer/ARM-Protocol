@@ -152,7 +152,7 @@ The ARM interface is a dark-theme React app with monospace typography designed f
 - **Round 1 grid** — 3-column AgentCard layout (Alpha, Beta, Gamma) + separate γ-Silent row
 - **R1 convergence meter** — Jaccard lexical similarity; warns at > 0.4
 - **Round 2 grid** — 2-column Alpha/Beta + full-width GammaCard
-- **Drift Summary panel** — asymmetric threshold table for all agents + Gamma self-delta
+- **Confidence-Δ panel** — descriptive per-agent confidence deltas + Gamma self-delta (labeled *unvalidated*; not a detector)
 - **Export JSON** — downloads full run telemetry as `arm-v0.9-run-{timestamp}.json`, sealed with a SHA-256 `export_integrity_hash`
 
 Each AgentCard shows: claim, confidence %, drift direction + label, decision basis tag, flags, self-check status, and an expandable section for critical path, assumptions, challenge surface, challenged claims, and drift note.
@@ -335,7 +335,8 @@ Every agent in every round produces a structured JSON trace:
 ```jsonc
 {
   "claim": "core conclusion",
-  "confidence": 0.0–1.0,
+  "verdict": "yes | no | conditional",   // structured bottom-line; feeds the polarity gate
+  "confidence": 0.0–1.0,                  // self-reported & unvalidated — descriptive, not a detector
   "reasoning_frame": "deontological | consequentialist | independent",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
   "assumptions": ["explicit list"],
@@ -355,7 +356,7 @@ Every agent in every round produces a structured JSON trace:
   "influenced_by": ["agent ids that changed reasoning"],
   "challenged": ["specific claims explicitly rejected"],
   "drift_note": "what changed from R1 and why",
-  "drift_score": { "confidence_delta": number }
+  "drift_score": { "confidence_delta": number }  // descriptive only; not used as a detector (see experiments/c1vc2)
 }
 ```
 
@@ -376,6 +377,25 @@ Gamma R2 adds:
 ---
 
 ## 📜 Version History
+
+### Unreleased — Confidence-drift detector retired
+
+The C1-vs-C2 injection experiment (`experiments/c1vc2`) scored ARM's own
+confidence-drift signal as a contamination detector against ground truth and it
+came back **at chance (AUC ≈ 0.44)** — of 33 real false-premise adoptions, the
+magnitude flag caught **0** while the verdict-flip signal caught **30**. The
+confidence-delta machinery is therefore demoted from *detector* to *description*:
+
+- **FAP isolation re-dispatch: disabled.** An Alpha/Beta R2 delta > +0.04 no
+  longer re-dispatches the agent or writes a `memetic`/`epistemic` verdict — it is
+  logged as a diagnostic breadcrumb (`fap_drift_triggered`) only.
+- **`gamma_drift_exceeded`: downgraded** to a logged diagnostic.
+- **Polarity / verdict-flip gate is now the primary drift detector**, and reads
+  the structured `verdict` field (`extractVerdict`) instead of parsing the claim.
+- **`driftLabel` relabeled** to descriptive direction/magnitude ("upward shift",
+  "downward shift") — the "memetic drift" / "epistemic tightening" verdicts are gone.
+- **`confidence` is documented as self-reported and unvalidated**; the behavioral
+  IPR metric in `experiments/c1vc2` is the falsifiable signal that replaces it.
 
 ### v0.9 — Reconciler Coverage & Matched-Panel Validation
 
@@ -426,8 +446,12 @@ The Fallback Audit Protocol now acts pre-reconciliation. When Alpha or Beta's R2
 
 Validated: an agent that flipped YES→NO under peer pressure reverted to YES in isolation — full claim reversal plus confidence drop, classified memetic.
 
+> **Superseded (post-v0.9):** the confidence-drift signal this circuit breaker rode on was later falsified as a contamination detector (`experiments/c1vc2`, AUC ≈ 0.44 — below chance). The isolation re-dispatch and its `memetic`/`epistemic` classification have been **disabled**; a +0.04 delta is now a logged breadcrumb only. The **polarity gate** (§1) is the primary detector. See the top of Version History.
+
 #### 3. Gamma Drift Forensic Flag
 `gamma_drift_exceeded` fires post-reconciliation when Gamma's `self_delta_vs_baseline` exceeds +0.04. Distinct from FAP (preventive, Alpha/Beta) — this is a forensic flag on the reconciler itself.
+
+> **Superseded (post-v0.9):** downgraded to a logged diagnostic for the same reason — self-delta magnitude is not a validated signal.
 
 #### 4. Export Integrity Hash
 Every exported run is sealed with a SHA-256 `export_integrity_hash` computed over the payload. To verify independently: remove the `export_integrity_hash` field, serialize the remaining object with `JSON.stringify(payload, null, 2)` (2-space indent, UTF-8), and SHA-256 hash the result. The implementation hashes exactly this representation, so verification must replicate the same serialization.
@@ -448,6 +472,8 @@ Previous versions used a symmetric ±0.05 memetic drift flag. v0.7.1 splits this
 | Δ < **-0.15** | Deep down | deep tightening | Extreme calibration — noted separately |
 
 Tightening (downward drift) is healthy; only upward drift is the threat. The threshold was tightened from 0.05 → 0.04 to be more sensitive.
+
+> **Superseded (post-v0.9):** the interpretive labels above ("epistemic tightening", "memetic drift") claimed an epistemic meaning the signal doesn't carry — the `experiments/c1vc2` detector run put confidence-drift discrimination at AUC ≈ 0.44. The thresholds now only bound **descriptive** direction/magnitude labels ("downward shift" / "minor shift" / "upward shift") and drive no action.
 
 #### 2. Rotating Silent Baseline
 Previously γ-Silent was always Gamma. v0.7.1 adds a UI selector:

@@ -18,26 +18,26 @@ describe('driftLabel', () => {
     expect(driftLabel(null).label).toBe('—');
   });
 
-  it('classifies the asymmetric threshold boundaries exactly', () => {
-    // Below DRIFT_DOWN_THRESHOLD → deep tightening
-    expect(driftLabel(DRIFT_DOWN_THRESHOLD - 0.001).label).toBe('deep tightening');
-    // Exactly at the down threshold is NOT deep — n < threshold is strict
-    expect(driftLabel(DRIFT_DOWN_THRESHOLD).label).toBe('epistemic tightening');
-    // Any non-positive delta is healthy tightening
-    expect(driftLabel(-0.05).label).toBe('epistemic tightening');
-    expect(driftLabel(0).label).toBe('epistemic tightening');
+  it('classifies the descriptive Δ bands exactly', () => {
+    // Below DRIFT_DOWN_THRESHOLD → large downward shift
+    expect(driftLabel(DRIFT_DOWN_THRESHOLD - 0.001).label).toBe('large downward shift');
+    // Exactly at the down threshold is NOT large — n < threshold is strict
+    expect(driftLabel(DRIFT_DOWN_THRESHOLD).label).toBe('downward shift');
+    // Any non-positive delta reads as a downward shift
+    expect(driftLabel(-0.05).label).toBe('downward shift');
+    expect(driftLabel(0).label).toBe('downward shift');
     // (0, DRIFT_UP_THRESHOLD] → minor shift; exactly at threshold is still minor
     expect(driftLabel(0.01).label).toBe('minor shift');
     expect(driftLabel(DRIFT_UP_THRESHOLD).label).toBe('minor shift');
-    // Above the up threshold → memetic drift flag
-    expect(driftLabel(DRIFT_UP_THRESHOLD + 0.001).label).toBe('⚠ memetic drift');
+    // Above the up threshold → upward shift (descriptive, no longer a "memetic" verdict)
+    expect(driftLabel(DRIFT_UP_THRESHOLD + 0.001).label).toBe('upward shift');
   });
 
   it('coerces numeric strings, normalizing Unicode minus signs', () => {
-    expect(driftLabel('-0.05').label).toBe('epistemic tightening');
-    expect(driftLabel('−0.05').label).toBe('epistemic tightening'); // U+2212 minus
-    expect(driftLabel('–0.2').label).toBe('deep tightening');       // en-dash
-    expect(driftLabel(' 0.1 ').label).toBe('⚠ memetic drift');
+    expect(driftLabel('-0.05').label).toBe('downward shift');
+    expect(driftLabel('−0.05').label).toBe('downward shift'); // U+2212 minus
+    expect(driftLabel('–0.2').label).toBe('large downward shift');  // en-dash
+    expect(driftLabel(' 0.1 ').label).toBe('upward shift');
   });
 
   it('never falls through non-numeric garbage to a drift verdict', () => {

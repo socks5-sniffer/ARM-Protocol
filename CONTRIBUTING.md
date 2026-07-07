@@ -2,7 +2,7 @@
 
 First off, thank you for considering contributing to ARM! 
 
-This protocol started as an independent research project into AI safety, the "Persuasion Duality," and multi-agent reasoning transparency. It has grown into a robust framework for detecting memetic drift and epistemic tightening. Contributions from developers, AI safety researchers, and prompt engineers are all highly encouraged.
+This protocol started as an independent research project into AI safety, the "Persuasion Duality," and multi-agent reasoning transparency. It has grown into a framework for studying how reasoning propagates across agents — using verdict-flip detection and a ground-truthed injection testbed (`experiments/c1vc2`) rather than the confidence-drift signal that testbed falsified. Contributions from developers, AI safety researchers, and prompt engineers are all highly encouraged.
 
 ## 🔬 Where We Need Help
 
@@ -34,7 +34,7 @@ We are committed to providing a welcoming and inspiring community for all.
 
 ## 🧪 Research Methodology Note
 
-If your PR includes changes to the core prompt architecture (`buildAlphaR1`, `buildBetaR1`, `buildAlphaR2`, `buildBetaR2`, and `SYSTEM_GAMMA_R2` in `src/prompts.js`, or the inline Gamma R1 prompt dispatched from `src/App.jsx`), please include data from a few test runs in your Pull Request description. ARM is an empirical research tool, and prompt changes should ideally be backed by observable shifts in drift scores or convergence metrics.
+If your PR includes changes to the core prompt architecture (`buildAlphaR1`, `buildBetaR1`, `buildAlphaR2`, `buildBetaR2`, and `SYSTEM_GAMMA_R2` in `src/prompts.js`, or the inline Gamma R1 prompt dispatched from `src/App.jsx`), please include data from a few test runs in your Pull Request description. ARM is an empirical research tool, and prompt changes should ideally be backed by observable shifts in the falsifiable metrics — verdict-flip / polarity-gate behavior, injection propagation rate (`experiments/c1vc2`), or convergence — rather than confidence-drift magnitude, which is descriptive only.
 
 ---
 

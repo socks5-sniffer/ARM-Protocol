@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ARM is pre-1.0 research software: minor versions may carry breaking protocol or
 trace-schema changes.
 
+## [Unreleased]
+
+### Changed
+- **Confidence-drift retired as a detector.** The C1-vs-C2 injection experiment
+  (`experiments/c1vc2`) scored ARM's confidence-drift signal against ground truth
+  at **AUC ≈ 0.44** (below chance; 0 of 33 real false-premise adoptions caught by
+  the magnitude flag vs. 30 by verdict-flip). Consequences:
+  - **FAP isolation re-dispatch disabled** — a +0.04 Alpha/Beta R2 delta is now a
+    logged `fap_drift_triggered` breadcrumb, not a re-dispatch plus
+    `memetic`/`epistemic` classification.
+  - **`gamma_drift_exceeded` downgraded** to a logged diagnostic.
+  - **Polarity / verdict-flip gate is now the primary drift detector** and reads
+    the structured `verdict` field via `extractVerdict`.
+  - **`driftLabel` relabeled** to descriptive direction/magnitude ("upward shift" /
+    "downward shift"); the "memetic drift" / "epistemic tightening" verdicts are removed.
+  - **`confidence` documented as self-reported and unvalidated**; the behavioral IPR
+    metric in `experiments/c1vc2` is the falsifiable signal.
+
+### Removed
+- `fap_requeue` block from run output — isolation re-dispatch no longer occurs.
+
 ## [0.9.0] — 2026-06-23
 
 First public release.
