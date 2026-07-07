@@ -32,3 +32,14 @@ export function extractClaimDirection(claim) {
   if (!/\bnot\b/.test(text) && /\bshould\b/.test(text)) return "yes";
   return "unknown";
 }
+
+// ─── Verdict (prefers the structured field over claim parsing) ─────────────────
+// The Slide 8 fix: agents now declare `verdict: yes|no|conditional` as a
+// first-class field. Prefer it; fall back to extractClaimDirection for older
+// traces that predate the field. Returns "yes" | "no" | "conditional" | "unknown".
+export function extractVerdict(trace) {
+  if (!trace) return "unknown";
+  const v = typeof trace.verdict === "string" ? trace.verdict.trim().toLowerCase() : "";
+  if (v === "yes" || v === "no" || v === "conditional") return v;
+  return extractClaimDirection(trace.claim);
+}
