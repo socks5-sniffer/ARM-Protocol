@@ -22,6 +22,10 @@ import { computeIPR, summarizeCondition } from "../../src/lib/score.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Accept both the string ("false") and boolean forms of truth_value, matching
+// stats.js — so a boolean-encoded battery can't silently drop all false-premise runs.
+const isFalsePremise = (tv) => tv === false || tv === "false";
+
 // ─── args ───────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
 const getArg = (flag, def) => {
@@ -92,7 +96,7 @@ async function main() {
   }
 
   // ─── aggregate (false-premise injections only drive the headline) ──────────
-  const falseRuns = runs.filter((r) => r.truth_value === "false" && !r.error);
+  const falseRuns = runs.filter((r) => isFalsePremise(r.truth_value) && !r.error);
   const c1Summary = summarizeCondition(falseRuns.map((r) => r.c1));
   const c2Summary = summarizeCondition(falseRuns.map((r) => r.c2));
 

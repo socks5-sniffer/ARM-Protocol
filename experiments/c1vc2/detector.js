@@ -65,6 +65,11 @@ const confOf = (subjects, agent) => {
   return typeof c === "number" ? c : null;
 };
 
+// truth_value is a string ("false") in every current battery, but stats.js accepts
+// the boolean form too — mirror that so a boolean-encoded battery can't silently
+// drop all false-premise runs and zero out the contaminated class.
+const isFalsePremise = (tv) => tv === false || tv === "false";
+
 const samples = []; // { file, injection, agent, contaminated, adopted, drift, verdictFlip }
 for (const file of files) {
   let data;
@@ -76,13 +81,16 @@ for (const file of files) {
   }
   for (const run of data.runs || []) {
     if (run.error || !run.c2?.details) continue;
-    const isFalse = run.truth_value === "false";
+    const isFalse = isFalsePremise(run.truth_value);
     const controlSubjects = run.raw?.control?.subjects;
     const c2Subjects = run.raw?.c2?.subjects;
     for (const d of run.c2.details) {
       const confC2 = confOf(c2Subjects, d.agent);
       const confCtrl = confOf(controlSubjects, d.agent);
-      const drift = confC2 != null && confCtrl != null ? Math.abs(confC2 - confCtrl) : 0;
+      // null (not 0) when unscorable, so a parse-failed/missing-confidence instance
+      // is EXCLUDED from the drift ROC rather than counted as a perfect "no-drift"
+      // negative. (No such instances exist in the committed data — this is a guard.)
+      const drift = confC2 != null && confCtrl != null ? Math.abs(confC2 - confCtrl) : null;
       samples.push({
         file: path.basename(file),
         injection: run.injection_id,
@@ -105,17 +113,19 @@ const nPos = samples.filter((s) => s.contaminated).length;
 const nNeg = samples.length - nPos;
 
 // ─── operating points ─────────────────────────────────────────────────────────
-const atDrift = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.drift >= tau })));
+const atDrift = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.drift != null && s.drift >= tau })));
 const atFlip = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.verdictFlip })));
 
 // ─── ROC over the confidence-drift score ──────────────────────────────────────
-// Sweep every distinct drift value as a threshold; flagged = drift >= τ.
-const thresholds = [...new Set(samples.map((s) => s.drift))].sort((a, b) => b - a);
-const roc = [{ tau: Infinity, tpr: 0, fpr: 0, tp: 0, fp: 0 }];
+// Sweep every distinct (scorable) drift value as a threshold; flagged = drift >= τ.
+// null drifts are unscorable and never flagged. tau: null is the "≥∞" origin point
+// (JSON has no Infinity — this makes the serialized value intentional, not coerced).
+const thresholds = [...new Set(samples.filter((s) => s.drift != null).map((s) => s.drift))].sort((a, b) => b - a);
+const roc = [{ tau: null, tpr: 0, fpr: 0, tp: 0, fp: 0 }];
 for (const t of thresholds) {
   let tp = 0, fp = 0;
   for (const s of samples) {
-    if (s.drift >= t) {
+    if (s.drift != null && s.drift >= t) {
       if (s.contaminated) tp++;
       else fp++;
     }
@@ -162,7 +172,7 @@ console.log(`  precision=${pct(atFlip.precision)}  recall=${pct(atFlip.recall)} 
 console.log(`\n── ROC (confidence-drift score) ──`);
 console.log(`  τ≥        FPR      TPR     (tp/fp)`);
 for (const p of roc) {
-  const tl = p.tau === Infinity ? "  ∞" : num(p.tau).padStart(5);
+  const tl = p.tau == null ? "  ∞" : num(p.tau).padStart(5);
   console.log(`  ${tl}    ${pct(p.fpr).padStart(6)}   ${pct(p.tpr).padStart(6)}   (${p.tp}/${p.fp})`);
 }
 console.log(`\n  AUC = ${auc == null ? "— (need both classes)" : auc.toFixed(3)}`);

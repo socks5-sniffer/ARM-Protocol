@@ -14,7 +14,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 ARM research centers on a structural vulnerability in multi-agent AI: the **Persuasion Duality**. While sharing explicit reasoning makes a model's logic auditable and robust, it simultaneously amplifies that agent's persuasive power over its peers. Without a calibration anchor, shared reasoning traces can cause **memetic drift** — where a plausible-sounding but flawed assumption propagates and compounds across agents into baseless consensus.
 
-ARM is designed to detect and measure this drift before it becomes invisible.
+ARM was originally designed to detect and measure this drift via a confidence signal — but that specific detector did not survive testing (below). The falsifiable signals ARM now relies on are behavioral: verdict-direction change and injection-propagation rate, not confidence magnitude.
 
 > **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **AUC ≈ 0.44 — below chance**. The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
 
