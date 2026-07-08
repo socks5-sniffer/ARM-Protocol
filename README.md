@@ -4,7 +4,7 @@
 
 Current multi-agent AI systems operate on a "black-box" communication model: they pass outputs to one another like text messages, discarding the intricate cognitive pathways that produced those outputs.
 
-**ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
+**ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with explicit, auditable reconciliation.
 
 > **Current version:** `v0.9` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash` (any agent slot can be assigned to any provider)
 
