@@ -49,3 +49,22 @@ export function extractVerdict(trace) {
   if (v === "yes" || v === "no" || v === "conditional") return v;
   return extractClaimDirection(trace.claim);
 }
+
+// ─── Verdict transition (Gamma R1 → R2) ────────────────────────────────────────
+// Classifies how the reconciler's verdict moved, so two signals of different
+// severity can key off one place:
+//   "flip"    — a firm yes↔no reversal. This is what the Polarity Gate acts on
+//               (overrides reconciliation_status, forces manual review).
+//   "shift"   — a change that involves "conditional" (hedged to it, or firmed away
+//               from it). Real but softer than a reversal — an advisory flag only,
+//               NOT a gate action.
+//   "none"    — verdict unchanged.
+//   "unknown" — a verdict is missing/unparseable (e.g. a parse-failed reconciler);
+//               nothing can be asserted.
+export function classifyVerdictTransition(v1, v2) {
+  const isFirm = (v) => v === "yes" || v === "no";
+  if (v1 === "unknown" || v2 === "unknown" || v1 == null || v2 == null) return "unknown";
+  if (v1 === v2) return "none";
+  if (isFirm(v1) && isFirm(v2)) return "flip";
+  return "shift"; // one side is "conditional"
+}

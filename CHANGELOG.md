@@ -9,6 +9,17 @@ trace-schema changes.
 
 ## [Unreleased]
 
+### Added
+- **Verdict-shift advisory flag.** A signal weaker than the polarity gate: when the
+  Gamma reconciler's verdict moves *involving* `conditional` (a firm `yes`/`no`
+  hedging to `conditional`, or firming away from it) rather than a firm `yes`↔`no`
+  reversal, a `verdict_shift` block is written to the trace and `verdict_shift_flagged`
+  is set on `runMeta`, with a lower-severity UI badge on the Gamma card. It is
+  **advisory only** — unlike the gate it does not override `reconciliation_status`
+  or `self_check`, and `requires_manual_review` is `false`. The shared
+  `classifyVerdictTransition()` helper (`flip` | `shift` | `none` | `unknown`) drives
+  both the gate and the advisory so they stay mutually exclusive and consistent.
+
 ### Changed
 - **Confidence-drift retired as a detector.** The C1-vs-C2 injection experiment
   (`experiments/c1vc2`) scored ARM's confidence-drift signal against ground truth

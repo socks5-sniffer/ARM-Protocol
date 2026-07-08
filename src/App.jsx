@@ -32,7 +32,7 @@ import {
   deltaMismatch,
 } from "./lib/trace.js";
 import { peerTracesBlock, questionBlock } from "./lib/sanitize.js";
-import { driftLabel, extractVerdict } from "./lib/analysis.js";
+import { driftLabel, extractVerdict, classifyVerdictTransition } from "./lib/analysis.js";
 import { C, f } from "./theme.js";
 import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
@@ -344,10 +344,10 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
     // extractVerdict; treat anything that isn't a firm yes/no (conditional /
     // unknown) as non-firing, preserving the gate's yes↔no polarity semantics.
     if (pG2.ok) {
-      const dirOf = (t) => { const v = extractVerdict(t); return v === "yes" || v === "no" ? v : "unknown"; };
-      const r1Dir = dirOf(pG1.trace);
-      const r2Dir = dirOf(pG2.trace);
-      if (r1Dir !== "unknown" && r2Dir !== "unknown" && r1Dir !== r2Dir) {
+      const r1Dir = extractVerdict(pG1.trace);
+      const r2Dir = extractVerdict(pG2.trace);
+      const transition = classifyVerdictTransition(r1Dir, r2Dir);
+      if (transition === "flip") {
         pG2.trace.reconciliation_status = "gamma_flip_detected";
         pG2.trace.polarity_gate_fired = true;
         // Self-documenting audit block: the flip explains itself downstream.
@@ -358,7 +358,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           : (typeof pG2.trace.drift_score?.confidence_delta === "number" ? pG2.trace.drift_score.confidence_delta : null);
         pG2.trace.polarity_audit = {
           gamma_r1_polarity:      r1Dir,
-          gamma_silent_polarity:  dirOf(pSilent.trace),
+          gamma_silent_polarity:  extractVerdict(pSilent.trace),
           gamma_r2_polarity:      r2Dir,
           polarity_changed:       true,
           confidence_delta_blindspot: gammaDelta !== null && Math.abs(gammaDelta) <= DRIFT_UP_THRESHOLD,
@@ -374,6 +374,18 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           notes: `[POLARITY GATE OVERRIDE] Claim direction flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2. Gamma self-reported status "${originalStatus}" — overridden by gate. Original notes: ${originalNotes}`,
         };
         addLog(`⚠ POLARITY GATE: Gamma flipped ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} between R1 and R2 — reconciliation_status overridden`);
+      } else if (transition === "shift") {
+        // Advisory only — the reconciler hedged to / firmed from "conditional".
+        // Weaker than the polarity gate: it does NOT override reconciliation_status
+        // or self_check. It raises a flag so a human notices the verdict moved.
+        pG2.trace.verdict_shift = {
+          gamma_r1_verdict:       r1Dir,
+          gamma_r2_verdict:       r2Dir,
+          direction:              r2Dir === "conditional" ? "hedged_to_conditional" : "firmed_from_conditional",
+          requires_manual_review: false,
+          note: `Reconciler verdict shifted ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} — a hedge involving "conditional", not a yes↔no reversal. Advisory only.`,
+        };
+        addLog(`⚠ verdict shift: Gamma ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} — advisory flag (not the polarity gate)`);
       }
       // Gamma drift diagnostic — logged only. Like the Alpha/Beta confidence-drift
       // flag, self_delta magnitude is not a validated signal (see experiments/c1vc2);
@@ -396,6 +408,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       silentConfidence: pSilent.trace.confidence,
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
+      verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
       gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
