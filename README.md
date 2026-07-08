@@ -370,9 +370,20 @@ Gamma R2 adds:
   "rlhf_audit_notes": "string",
   "self_delta_vs_baseline": number,
   "reconciliation_status": "success | failed",
+  // Written by the harness when it fires:
+  "polarity_audit": { /* firm yes↔no reversal — the gate; requires_manual_review: true */ },
+  "verdict_shift": { /* hedge to/from "conditional" — advisory only; requires_manual_review: false */ },
   // schema_version: "arm-trace-v1.2" (written to runMeta.schema_version)
 }
 ```
+
+**Two verdict-change signals, different severity.** The **polarity gate**
+(`polarity_audit`) fires only on a firm `yes`↔`no` reversal and overrides
+`reconciliation_status` → `gamma_flip_detected` with `requires_manual_review: true`.
+The **verdict-shift advisory** (`verdict_shift`) fires when the reconciler hedges
+to or firms away from `conditional`; it is informational — it raises a flag and a
+UI badge but does **not** override reconciliation status or self-check. A
+parse-failed reconciler (no readable verdict) fires neither.
 
 ---
 
