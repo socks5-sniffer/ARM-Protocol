@@ -4,7 +4,7 @@
 
 Current multi-agent AI systems operate on a "black-box" communication model: they pass outputs to one another like text messages, discarding the intricate cognitive pathways that produced those outputs.
 
-**ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with verifiable epistemic tightening.
+**ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share their full internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with explicit, auditable reconciliation.
 
 > **Current version:** `v0.9` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash` (any agent slot can be assigned to any provider)
 
@@ -14,7 +14,9 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 ARM research centers on a structural vulnerability in multi-agent AI: the **Persuasion Duality**. While sharing explicit reasoning makes a model's logic auditable and robust, it simultaneously amplifies that agent's persuasive power over its peers. Without a calibration anchor, shared reasoning traces can cause **memetic drift** — where a plausible-sounding but flawed assumption propagates and compounds across agents into baseless consensus.
 
-ARM is designed to detect and measure this drift before it becomes invisible.
+ARM was originally designed to detect and measure this drift via a confidence signal — but that specific detector did not survive testing (below). The falsifiable signals ARM now relies on are behavioral: verdict-direction change and injection-propagation rate, not confidence magnitude.
+
+> **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **AUC ≈ 0.44 — below chance**. The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
 
 ---
 
@@ -150,7 +152,7 @@ The ARM interface is a dark-theme React app with monospace typography designed f
 - **Round 1 grid** — 3-column AgentCard layout (Alpha, Beta, Gamma) + separate γ-Silent row
 - **R1 convergence meter** — Jaccard lexical similarity; warns at > 0.4
 - **Round 2 grid** — 2-column Alpha/Beta + full-width GammaCard
-- **Drift Summary panel** — asymmetric threshold table for all agents + Gamma self-delta
+- **Confidence-Δ panel** — descriptive per-agent confidence deltas + Gamma self-delta (labeled *unvalidated*; not a detector)
 - **Export JSON** — downloads full run telemetry as `arm-v0.9-run-{timestamp}.json`, sealed with a SHA-256 `export_integrity_hash`
 
 Each AgentCard shows: claim, confidence %, drift direction + label, decision basis tag, flags, self-check status, and an expandable section for critical path, assumptions, challenge surface, challenged claims, and drift note.
@@ -244,13 +246,29 @@ This project is licensed under the Apache License, Version 2.0 — see `LICENSE`
 
 ## 📊 Key Empirical Findings
 
-All findings below are from the **matched mid/fast-tier panel** — `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash`, each provider's current fast default tier. The two source datasets are the CFAAq2 factorial (`trace/v0.8/v0.8-CFAAq2-cross-provider-analysis.md` — an 8-config factorial plus a same-day 8-run replication on one held-constant question) and the Q201–Q203 cross-domain study (`trace/v0.9/FINDINGS-q201-q203.md`).
+The **panel-composition findings** below are from the **matched mid/fast-tier panel** — `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash`, each provider's current fast default tier. The two source datasets are the CFAAq2 factorial (`trace/v0.8/v0.8-CFAAq2-cross-provider-analysis.md` — an 8-config factorial plus a same-day 8-run replication on one held-constant question) and the Q201–Q203 cross-domain study (`trace/v0.9/FINDINGS-q201-q203.md`). The **falsifiability result** that opens this section comes from a separate ground-truthed injection experiment (`experiments/c1vc2/`) with its own battery and detector, described in that subsection.
 
 > **Provenance note:** earlier v0.3–v0.7 runs used a mismatched `gpt-4o` / `gemini-2.5-pro` panel (a retired non-reasoning OpenAI model and a one-generation-old Gemini against current Claude). Those traces are retained in `/trace` for provenance but are **not** cited here as tier-controlled results — the re-run that supersedes them is complete and the matched-panel numbers below replace the old aggregates. Each trace file records the exact model used.
 
+### The drift signal fails as a contamination detector (C1 vs C2)
+
+This is a **negative result**, and it is the most important one for anyone relying on ARM's drift math. It comes from a separate, deliberately falsifiable experiment (`experiments/c1vc2/`): we plant a premise **we authored as false** into one agent's trace and measure whether downstream agents adopt it, under conclusion-only sharing (C1) vs. full-trace sharing (C2). Because we own the truth value of the plant, "did the lie spread?" is objectively scorable — no moral ground truth required.
+
+Scoring ARM's own confidence-drift signal as a *detector* of that contamination (`experiments/c1vc2/detector.js`, `src/lib/score.js`) yields a confusion matrix and ROC over 1,134 C2 subject-instances (33 contaminated / 1,101 clean):
+
+| Operating point | Precision | Recall | Notes |
+|---|---|---|---|
+| Confidence-drift flag (τ=0.1) | 0% | 0% | TP=0 — catches **zero** contaminated instances; 52 false alarms |
+| Verdict-flip flag (parameter-free) | 14% | 91% | Catches most, but 185 false positives |
+| **ROC AUC (confidence-drift score)** | — | — | **≈ 0.44 — below chance (0.5)** |
+
+An AUC below 0.5 means the confidence-magnitude drift signal is **worse than a coin flip** at separating contaminated subjects from clean ones. This directly falsifies the intuition, stated at the top of this README, that magnitude drift is a usable contamination *detector*. What survives is the **behavioral** metric: whether a subject adopts the false premise (IPR), which does not depend on self-reported confidence at all.
+
+**Caveats, stated up front:** the positive class is thin (33 contaminated instances), so treat AUC ≈ 0.44 as a directional falsification of the detector claim, not a locked point estimate. The experiment's own [`README`](experiments/c1vc2/README.md) still lists the missing pieces — power analysis, a permutation test on Δ(C2−C1), and pre-registration — before the *propagation* hypothesis (H1) itself is claimed as significant. Reproduce with `node experiments/c1vc2/detector.js`.
+
 ### Provider composition determines the answer more than the question does
 
-This is the central finding. One hard AI-safety question (autonomous network severance under a 60-second deadline, no human reachable) is held constant across 8 panel configurations; only ensemble composition and role injection vary:
+This is the central finding for panel design. One hard AI-safety question (autonomous network severance under a 60-second deadline, no human reachable) is held constant across 8 panel configurations; only ensemble composition and role injection vary:
 
 | Panel | Verdict | Confidence | Behavior |
 |---|---|---|---|
@@ -317,7 +335,8 @@ Every agent in every round produces a structured JSON trace:
 ```jsonc
 {
   "claim": "core conclusion",
-  "confidence": 0.0–1.0,
+  "verdict": "yes | no | conditional",   // structured bottom-line; feeds the polarity gate
+  "confidence": 0.0–1.0,                  // self-reported & unvalidated — descriptive, not a detector
   "reasoning_frame": "deontological | consequentialist | independent",
   "decision_basis": "utilitarian | deontological | hybrid | uncertain",
   "assumptions": ["explicit list"],
@@ -337,7 +356,7 @@ Every agent in every round produces a structured JSON trace:
   "influenced_by": ["agent ids that changed reasoning"],
   "challenged": ["specific claims explicitly rejected"],
   "drift_note": "what changed from R1 and why",
-  "drift_score": { "confidence_delta": number }
+  "drift_score": { "confidence_delta": number }  // descriptive only; not used as a detector (see experiments/c1vc2)
 }
 ```
 
@@ -351,13 +370,43 @@ Gamma R2 adds:
   "rlhf_audit_notes": "string",
   "self_delta_vs_baseline": number,
   "reconciliation_status": "success | failed",
+  // Written by the harness when it fires:
+  "polarity_audit": { /* firm yes↔no reversal — the gate; requires_manual_review: true */ },
+  "verdict_shift": { /* hedge to/from "conditional" — advisory only; requires_manual_review: false */ },
   // schema_version: "arm-trace-v1.2" (written to runMeta.schema_version)
 }
 ```
 
+**Two verdict-change signals, different severity.** The **polarity gate**
+(`polarity_audit`) fires only on a firm `yes`↔`no` reversal and overrides
+`reconciliation_status` → `gamma_flip_detected` with `requires_manual_review: true`.
+The **verdict-shift advisory** (`verdict_shift`) fires when the reconciler hedges
+to or firms away from `conditional`; it is informational — it raises a flag and a
+UI badge but does **not** override reconciliation status or self-check. A
+parse-failed reconciler (no readable verdict) fires neither.
+
 ---
 
 ## 📜 Version History
+
+### Unreleased — Confidence-drift detector retired
+
+The C1-vs-C2 injection experiment (`experiments/c1vc2`) scored ARM's own
+confidence-drift signal as a contamination detector against ground truth and it
+came back **at chance (AUC ≈ 0.44)** — of 33 real false-premise adoptions, the
+magnitude flag caught **0** while the verdict-flip signal caught **30**. The
+confidence-delta machinery is therefore demoted from *detector* to *description*:
+
+- **FAP isolation re-dispatch: disabled.** An Alpha/Beta R2 delta > +0.04 no
+  longer re-dispatches the agent or writes a `memetic`/`epistemic` verdict — it is
+  logged as a diagnostic breadcrumb (`fap_drift_triggered`) only.
+- **`gamma_drift_exceeded`: downgraded** to a logged diagnostic.
+- **Polarity / verdict-flip gate is now the primary drift detector**, and reads
+  the structured `verdict` field (`extractVerdict`) instead of parsing the claim.
+- **`driftLabel` relabeled** to descriptive direction/magnitude ("upward shift",
+  "downward shift") — the "memetic drift" / "epistemic tightening" verdicts are gone.
+- **`confidence` is documented as self-reported and unvalidated**; the behavioral
+  IPR metric in `experiments/c1vc2` is the falsifiable signal that replaces it.
 
 ### v0.9 — Reconciler Coverage & Matched-Panel Validation
 
@@ -408,8 +457,12 @@ The Fallback Audit Protocol now acts pre-reconciliation. When Alpha or Beta's R2
 
 Validated: an agent that flipped YES→NO under peer pressure reverted to YES in isolation — full claim reversal plus confidence drop, classified memetic.
 
+> **Superseded (post-v0.9):** the confidence-drift signal this circuit breaker rode on was later falsified as a contamination detector (`experiments/c1vc2`, AUC ≈ 0.44 — below chance). The isolation re-dispatch and its `memetic`/`epistemic` classification have been **disabled**; a +0.04 delta is now a logged breadcrumb only. The **polarity gate** (§1) is the primary detector. See the top of Version History.
+
 #### 3. Gamma Drift Forensic Flag
 `gamma_drift_exceeded` fires post-reconciliation when Gamma's `self_delta_vs_baseline` exceeds +0.04. Distinct from FAP (preventive, Alpha/Beta) — this is a forensic flag on the reconciler itself.
+
+> **Superseded (post-v0.9):** downgraded to a logged diagnostic for the same reason — self-delta magnitude is not a validated signal.
 
 #### 4. Export Integrity Hash
 Every exported run is sealed with a SHA-256 `export_integrity_hash` computed over the payload. To verify independently: remove the `export_integrity_hash` field, serialize the remaining object with `JSON.stringify(payload, null, 2)` (2-space indent, UTF-8), and SHA-256 hash the result. The implementation hashes exactly this representation, so verification must replicate the same serialization.
@@ -430,6 +483,8 @@ Previous versions used a symmetric ±0.05 memetic drift flag. v0.7.1 splits this
 | Δ < **-0.15** | Deep down | deep tightening | Extreme calibration — noted separately |
 
 Tightening (downward drift) is healthy; only upward drift is the threat. The threshold was tightened from 0.05 → 0.04 to be more sensitive.
+
+> **Superseded (post-v0.9):** the interpretive labels above ("epistemic tightening", "memetic drift") claimed an epistemic meaning the signal doesn't carry — the `experiments/c1vc2` detector run put confidence-drift discrimination at AUC ≈ 0.44. The thresholds now only bound **descriptive** direction/magnitude labels ("downward shift" / "minor shift" / "upward shift") and drive no action.
 
 #### 2. Rotating Silent Baseline
 Previously γ-Silent was always Gamma. v0.7.1 adds a UI selector:

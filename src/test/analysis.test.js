@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from 'vitest';
-import { driftLabel, extractClaimDirection } from '../lib/analysis.js';
+import { driftLabel, extractClaimDirection, classifyVerdictTransition } from '../lib/analysis.js';
 import {
   computeConvergence,
   computeTFIDFCosine,
@@ -18,26 +18,26 @@ describe('driftLabel', () => {
     expect(driftLabel(null).label).toBe('—');
   });
 
-  it('classifies the asymmetric threshold boundaries exactly', () => {
-    // Below DRIFT_DOWN_THRESHOLD → deep tightening
-    expect(driftLabel(DRIFT_DOWN_THRESHOLD - 0.001).label).toBe('deep tightening');
-    // Exactly at the down threshold is NOT deep — n < threshold is strict
-    expect(driftLabel(DRIFT_DOWN_THRESHOLD).label).toBe('epistemic tightening');
-    // Any non-positive delta is healthy tightening
-    expect(driftLabel(-0.05).label).toBe('epistemic tightening');
-    expect(driftLabel(0).label).toBe('epistemic tightening');
+  it('classifies the descriptive Δ bands exactly', () => {
+    // Below DRIFT_DOWN_THRESHOLD → large downward shift
+    expect(driftLabel(DRIFT_DOWN_THRESHOLD - 0.001).label).toBe('large downward shift');
+    // Exactly at the down threshold is NOT large — n < threshold is strict
+    expect(driftLabel(DRIFT_DOWN_THRESHOLD).label).toBe('downward shift');
+    // Any non-positive delta reads as a downward shift
+    expect(driftLabel(-0.05).label).toBe('downward shift');
+    expect(driftLabel(0).label).toBe('downward shift');
     // (0, DRIFT_UP_THRESHOLD] → minor shift; exactly at threshold is still minor
     expect(driftLabel(0.01).label).toBe('minor shift');
     expect(driftLabel(DRIFT_UP_THRESHOLD).label).toBe('minor shift');
-    // Above the up threshold → memetic drift flag
-    expect(driftLabel(DRIFT_UP_THRESHOLD + 0.001).label).toBe('⚠ memetic drift');
+    // Above the up threshold → upward shift (descriptive, no longer a "memetic" verdict)
+    expect(driftLabel(DRIFT_UP_THRESHOLD + 0.001).label).toBe('upward shift');
   });
 
   it('coerces numeric strings, normalizing Unicode minus signs', () => {
-    expect(driftLabel('-0.05').label).toBe('epistemic tightening');
-    expect(driftLabel('−0.05').label).toBe('epistemic tightening'); // U+2212 minus
-    expect(driftLabel('–0.2').label).toBe('deep tightening');       // en-dash
-    expect(driftLabel(' 0.1 ').label).toBe('⚠ memetic drift');
+    expect(driftLabel('-0.05').label).toBe('downward shift');
+    expect(driftLabel('−0.05').label).toBe('downward shift'); // U+2212 minus
+    expect(driftLabel('–0.2').label).toBe('large downward shift');  // en-dash
+    expect(driftLabel(' 0.1 ').label).toBe('upward shift');
   });
 
   it('never falls through non-numeric garbage to a drift verdict', () => {
@@ -45,6 +45,35 @@ describe('driftLabel', () => {
     expect(driftLabel(NaN).label).toBe('⚠ invalid delta');
     expect(driftLabel(Infinity).label).toBe('⚠ invalid delta');
     expect(driftLabel({}).label).toBe('⚠ invalid delta');
+  });
+});
+
+// ─── classifyVerdictTransition (polarity gate vs. advisory flag) ───────────────
+describe('classifyVerdictTransition', () => {
+  it('flags only a firm yes<->no reversal as a gate "flip"', () => {
+    expect(classifyVerdictTransition('yes', 'no')).toBe('flip');
+    expect(classifyVerdictTransition('no', 'yes')).toBe('flip');
+  });
+
+  it('treats any change involving "conditional" as a softer "shift"', () => {
+    expect(classifyVerdictTransition('yes', 'conditional')).toBe('shift');
+    expect(classifyVerdictTransition('no', 'conditional')).toBe('shift');
+    expect(classifyVerdictTransition('conditional', 'yes')).toBe('shift');
+    expect(classifyVerdictTransition('conditional', 'no')).toBe('shift');
+  });
+
+  it('returns "none" when the verdict did not change', () => {
+    expect(classifyVerdictTransition('yes', 'yes')).toBe('none');
+    expect(classifyVerdictTransition('conditional', 'conditional')).toBe('none');
+  });
+
+  it('returns "unknown" when either verdict is missing/unparseable', () => {
+    // A parse-failed reconciler yields "unknown" — nothing can be asserted,
+    // so neither the gate nor the advisory should fire.
+    expect(classifyVerdictTransition('yes', 'unknown')).toBe('unknown');
+    expect(classifyVerdictTransition('unknown', 'no')).toBe('unknown');
+    expect(classifyVerdictTransition(null, 'yes')).toBe('unknown');
+    expect(classifyVerdictTransition('yes', undefined)).toBe('unknown');
   });
 });
 

@@ -28,6 +28,11 @@ export function GammaCard({ trace }) {
         {trace.polarity_audit?.requires_manual_review === true && (
           <Tag color={C.warn} bg={C.warn + "20"}>MANUAL REVIEW REQUIRED</Tag>
         )}
+        {trace.verdict_shift && (
+          <Tag color={C.accent} bg={C.accent + "18"}>
+            ⚑ verdict shift {String(trace.verdict_shift.gamma_r1_verdict).toUpperCase()}→{String(trace.verdict_shift.gamma_r2_verdict).toUpperCase()}
+          </Tag>
+        )}
       </div>
 
       {(providerTag || modelTag) && (

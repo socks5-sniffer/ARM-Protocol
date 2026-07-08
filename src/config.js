@@ -32,9 +32,13 @@ export const TOKENS_R1    = Number(import.meta.env.VITE_TOKENS_R1    || 5000);
 export const TOKENS_R2    = Number(import.meta.env.VITE_TOKENS_R2    || 6500);
 export const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 8000); // Flash models cap at 8192; 8000 is safe ceiling
 
-// ─── Asymmetric drift config ──────────────────────────────────────────────────
-export const DRIFT_UP_THRESHOLD   =  0.04;  // tightened: memetic drift flag
-export const DRIFT_DOWN_THRESHOLD = -0.15;  // new: "deep tightening" — extreme calibration note
+// ─── Confidence-Δ band edges (descriptive only) ───────────────────────────────
+// These bound the direction/magnitude labels in analysis.js::driftLabel. They no
+// longer drive any action: confidence drift was falsified as a contamination
+// detector (experiments/c1vc2, AUC ≈ 0.44), so crossing DRIFT_UP_THRESHOLD is a
+// logged breadcrumb, not a trigger. The polarity/verdict-flip gate is the detector.
+export const DRIFT_UP_THRESHOLD   =  0.04;  // upper edge of the "minor shift" band
+export const DRIFT_DOWN_THRESHOLD = -0.15;  // lower edge → "large downward shift"
 
 // ─── Validation / measurement config ──────────────────────────────────────────
 export const VALID_DISAGREEMENT   = ["none", "information", "reasoning", "values"];
