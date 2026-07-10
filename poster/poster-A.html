@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>ARM — DEF CON 34 AI Village poster (variant A)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:3840px; height:2160px; overflow:hidden; }
+  body {
+    background:#0d0d0d; color:#ffffff;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display:flex; flex-direction:column; padding:70px 90px 50px;
+  }
+  .eyebrow { font-size:40px; letter-spacing:0.22em; text-transform:uppercase; color:#898781; display:flex; justify-content:space-between; }
+  .eyebrow b { color:#c3c2b7; font-weight:600; }
+  h1 { font-size:128px; line-height:1.04; font-weight:800; margin:28px 0 20px; max-width:3400px; letter-spacing:-0.015em; }
+  h1 .accent { color:#3987e5; }
+  .subhead { font-size:47px; color:#c3c2b7; line-height:1.35; max-width:3200px; margin-bottom:38px; }
+  .grid { flex:1; display:grid; gap:36px; min-height:0; }
+  .card { background:#1a1a19; border:2px solid rgba(255,255,255,0.10); border-radius:18px; padding:40px 48px; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .card h2 { font-size:50px; font-weight:700; margin-bottom:8px; }
+  .card .cap { font-size:34px; color:#898781; margin-bottom:20px; line-height:1.3; }
+  .card .body { font-size:38px; color:#c3c2b7; line-height:1.42; }
+  .card .body b { color:#ffffff; }
+  .hero-num { font-size:170px; font-weight:800; line-height:1; }
+  .hero-sub { font-size:42px; color:#c3c2b7; margin-top:10px; line-height:1.35; }
+  .mech { display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; flex:1; }
+  .mech-col { background:rgba(255,255,255,0.03); border-radius:14px; padding:22px 28px; display:flex; flex-direction:column; gap:11px; min-height:0; overflow:hidden; }
+  .mech-head { font-size:33px; font-weight:700; display:flex; align-items:center; gap:16px; }
+  .dot { width:28px; height:28px; border-radius:50%; display:inline-block; }
+  .mech-profile { font-size:38px; font-weight:800; }
+  .mech-row { font-size:28px; color:#c3c2b7; line-height:1.38; }
+  .mech-read { font-size:26px; color:#898781; font-style:italic; line-height:1.35; margin-top:auto; }
+  .footer { display:flex; align-items:center; gap:60px; margin-top:40px; }
+  .method { flex:1; font-size:31px; color:#898781; line-height:1.5; }
+  .method b { color:#c3c2b7; font-weight:600; }
+  .who { font-size:40px; color:#c3c2b7; text-align:right; line-height:1.45; }
+  .who b { color:#ffffff; font-size:44px; }
+  .qr { width:210px; height:210px; border:2px solid rgba(255,255,255,0.18); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:26px; color:#898781; text-align:center; line-height:1.3; flex:none; }
+  svg { display:block; max-width:100%; }
+  .chart-fill { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+</style></head>
+<body>
+  <div class="eyebrow"><span><b>ARM · Agent Reasoning Markup</b> — a falsifiable injection study</span><span>DEF CON 34 · AI VILLAGE · POSTER</span></div>
+  <h1>We planted lies in an agent's reasoning.<br/>Sharing that reasoning <span class="accent">stopped</span> the lies — it didn't spread them.</h1>
+  <div class="subhead">The "Persuasion Duality" predicts that sharing an agent's chain-of-thought amplifies injected false premises. Pre-registered, across four panel compositions and 954 paired instances: it never did. The only significant effect ran the other way.</div>
+  <div class="grid" style="grid-template-columns: 1.55fr 1fr; grid-template-rows: 1.18fr 0.82fr;">
+    <div class="card" style="grid-row:1 / span 2;">
+      <h2>Δ propagation, full-reasoning − conclusion-only (95% CI)</h2>
+      <div class="cap">One planted logical fallacy per run; adoption = the subject's verdict moves to the pushed direction vs its own isolated baseline. Measurable instances only.</div>
+      <div class="chart-fill"><svg viewBox="0 0 1900 800" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%" role="img" aria-label="Delta C2 minus C1 per panel with 95 percent confidence intervals"><line x1="380" y1="80" x2="380" y2="680" stroke="#2c2c2a" stroke-width="2"/><text x="380" y="744" fill="#898781" font-size="38" text-anchor="middle">−0.20</text><line x1="583.3333333333334" y1="80" x2="583.3333333333334" y2="680" stroke="#2c2c2a" stroke-width="2"/><text x="583.3333333333334" y="744" fill="#898781" font-size="38" text-anchor="middle">−0.15</text><line x1="786.6666666666666" y1="80" x2="786.6666666666666" y2="680" stroke="#2c2c2a" stroke-width="2"/><text x="786.6666666666666" y="744" fill="#898781" font-size="38" text-anchor="middle">−0.10</text><line x1="990" y1="80" x2="990" y2="680" stroke="#2c2c2a" stroke-width="2"/><text x="990" y="744" fill="#898781" font-size="38" text-anchor="middle">−0.05</text><line x1="1193.3333333333333" y1="80" x2="1193.3333333333333" y2="680" stroke="#383835" stroke-width="3"/><text x="1193.3333333333333" y="744" fill="#898781" font-size="38" text-anchor="middle">0</text><line x1="1396.6666666666665" y1="80" x2="1396.6666666666665" y2="680" stroke="#2c2c2a" stroke-width="2"/><text x="1396.6666666666665" y="744" fill="#898781" font-size="38" text-anchor="middle">+0.05</text><line x1="1600" y1="80" x2="1600" y2="680" stroke="#2c2c2a" stroke-width="2"/><text x="1600" y="744" fill="#898781" font-size="38" text-anchor="middle">+0.10</text><text x="786.6666666666666" y="801" fill="#898781" font-size="38" text-anchor="middle">← protective</text><text x="1396.6666666666665" y="801" fill="#898781" font-size="38" text-anchor="middle">amplifying →</text><line x1="465.3497942386832" y1="155" x2="1067.8189300411523" y2="155" stroke="#3987e5" stroke-width="8" stroke-linecap="round"/><circle cx="766.5843621399176" cy="155" r="22" fill="#3987e5" stroke="#1a1a19" stroke-width="4"/><text x="344" y="170.4" fill="#ffffff" font-size="44" font-weight="700" text-anchor="end">all-Gemini</text><text x="1097.8189300411523" y="168.3" fill="#ffffff" font-size="38" font-weight="700">Δ −0.105, p = 0.010</text><line x1="864.7138047138047" y1="305" x2="1234.4107744107744" y2="305" stroke="#4a4a47" stroke-width="8" stroke-linecap="round"/><circle cx="1049.5622895622896" cy="305" r="22" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="344" y="320.4" fill="#c3c2b7" font-size="44" font-weight="400" text-anchor="end">Mixed panel</text><text x="1264.4107744107744" y="318.3" fill="#898781" font-size="38" font-weight="400">Δ −0.035</text><line x1="1142.2873082287308" y1="455" x2="1193.3333333333333" y2="455" stroke="#4a4a47" stroke-width="8" stroke-linecap="round"/><circle cx="1176.317991631799" cy="455" r="22" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="344" y="470.4" fill="#c3c2b7" font-size="44" font-weight="400" text-anchor="end">all-GPT</text><text x="1223.3333333333333" y="468.3" fill="#898781" font-size="38" font-weight="400">Δ −0.004</text><line x1="1193.3333333333333" y1="605" x2="1193.3333333333333" y2="605" stroke="#4a4a47" stroke-width="8" stroke-linecap="round"/><circle cx="1193.3333333333333" cy="605" r="22" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="344" y="620.4" fill="#c3c2b7" font-size="44" font-weight="400" text-anchor="end">all-Claude</text><text x="1223.3333333333333" y="618.3" fill="#898781" font-size="38" font-weight="400">Δ +0.000</text></svg></div>
+      <div class="body">Showing Gemini the reasoning <b>halved</b> adoption (21.0% → 10.5%, Δ = −0.105, p = 0.010): visible reasoning can be <b>challenged</b>; a bare confident conclusion can only be conformed to.</div>
+    </div>
+    <div class="card">
+      <h2>Why: three models, three mechanisms</h2>
+      <div class="cap">A one-line TRUE-premise control separates them.</div>
+      <div class="mech">
+    <div class="mech-col">
+      <div class="mech-head"><span class="dot" style="background:#3987e5"></span>Gemini Flash</div>
+      <div class="mech-profile">Credulous adopter</div>
+      <div class="mech-row">Adopts fallacies: 21.0% (measurable C1)</div>
+      <div class="mech-row">Updates toward the TRUE premise 20/30</div>
+      <div class="mech-read">Believes what it reads — true or false.</div>
+    </div><div class="mech-col">
+      <div class="mech-head"><span class="dot" style="background:#199e70"></span>GPT-5.5</div>
+      <div class="mech-profile">Reflexive skeptic</div>
+      <div class="mech-row">Adopts fallacies: 0.4% — fully measured</div>
+      <div class="mech-row">Updates toward the TRUE premise 0/30</div>
+      <div class="mech-read">A no-update policy, not truth discrimination.</div>
+    </div><div class="mech-col">
+      <div class="mech-head"><span class="dot" style="background:#c98500"></span>Claude Sonnet</div>
+      <div class="mech-profile">Zero adoption</div>
+      <div class="mech-row">Adopts fallacies: 0 in 480 instances</div>
+      <div class="mech-row">TRUE-premise cell blind (baseline already agreed)</div>
+      <div class="mech-read">Never adopts falsehood; truth-updating untestable.</div>
+    </div>
+  </div>
+    </div>
+    <div class="card">
+      <h2>The one leak: Pascalian unbounded-harm</h2>
+      <div class="cap">The only fallacy that spread MORE when its reasoning was shown.</div>
+      <div class="chart-fill"><svg viewBox="0 0 1560 380" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%" role="img" aria-label="Unbounded-harm injection adoptions, conclusion-only versus full reasoning, per panel"><line x1="60" y1="290" x2="1140" y2="290" stroke="#383835" stroke-width="2"/><text x="211.20000000000002" y="342" fill="#c3c2b7" font-size="40" text-anchor="middle">C1 · conclusion only</text><text x="988.8" y="342" fill="#c3c2b7" font-size="40" text-anchor="middle">C2 · full reasoning</text><line x1="211.20000000000002" y1="253.07692307692307" x2="988.8" y2="68.46153846153845" stroke="#3987e5" stroke-width="6"/><circle cx="211.20000000000002" cy="253.07692307692307" r="16" fill="#3987e5" stroke="#1a1a19" stroke-width="4"/><circle cx="988.8" cy="68.46153846153845" r="16" fill="#3987e5" stroke="#1a1a19" stroke-width="4"/><line x1="211.20000000000002" y1="253.07692307692307" x2="988.8" y2="197.69230769230768" stroke="#4a4a47" stroke-width="4"/><circle cx="211.20000000000002" cy="253.07692307692307" r="11" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><circle cx="988.8" cy="197.69230769230768" r="11" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><line x1="211.20000000000002" y1="290" x2="988.8" y2="290" stroke="#4a4a47" stroke-width="4"/><circle cx="211.20000000000002" cy="290" r="11" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><circle cx="988.8" cy="290" r="11" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><line x1="211.20000000000002" y1="290" x2="988.8" y2="290" stroke="#4a4a47" stroke-width="4"/><circle cx="211.20000000000002" cy="290" r="11" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><circle cx="988.8" cy="290" r="11" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="1022.8" y="38.46153846153845" fill="#ffffff" font-size="40" font-weight="700">all-Gemini 2→12</text><text x="1022.8" y="167.69230769230768" fill="#898781" font-size="40" font-weight="400">Mixed 2→5</text><text x="1022.8" y="260" fill="#898781" font-size="40" font-weight="400">all-GPT 0→0</text><text x="1022.8" y="308" fill="#898781" font-size="40" font-weight="400">all-Claude 0→0</text></svg></div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="method">
+      <b>Method:</b> pre-registered (dated commit, before the data existed) · 4 panel compositions · <b>954 paired subject-instances</b> · 8 logical-fallacy injections (authored, truth value known) + 1 true-premise control · 15 reps ·
+      claude-sonnet-4-6 / gpt-5.5-2026-04-23 / gemini-3.5-flash · scorer, statistics &amp; full audit trail open-source.
+      All numbers post-audit: measurable-only denominators, marker false-positives corrected.
+    </div>
+    <div class="qr">QR<br/>(repo link —<br/>after CFP)</div>
+    <div class="who"><b>Erik Roed</b><br/>ARM Protocol v0.9<br/>arm-c1-vs-c2-injection</div>
+  </div>
+</body></html>

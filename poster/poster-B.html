@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>ARM — DEF CON 34 AI Village poster (variant B)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:3840px; height:2160px; overflow:hidden; }
+  body {
+    background:#0d0d0d; color:#ffffff;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display:flex; flex-direction:column; padding:70px 90px 50px;
+  }
+  .eyebrow { font-size:40px; letter-spacing:0.22em; text-transform:uppercase; color:#898781; display:flex; justify-content:space-between; }
+  .eyebrow b { color:#c3c2b7; font-weight:600; }
+  h1 { font-size:128px; line-height:1.04; font-weight:800; margin:28px 0 20px; max-width:3400px; letter-spacing:-0.015em; }
+  h1 .accent { color:#3987e5; }
+  .subhead { font-size:47px; color:#c3c2b7; line-height:1.35; max-width:3200px; margin-bottom:38px; }
+  .grid { flex:1; display:grid; gap:36px; min-height:0; }
+  .card { background:#1a1a19; border:2px solid rgba(255,255,255,0.10); border-radius:18px; padding:40px 48px; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .card h2 { font-size:50px; font-weight:700; margin-bottom:8px; }
+  .card .cap { font-size:34px; color:#898781; margin-bottom:20px; line-height:1.3; }
+  .card .body { font-size:38px; color:#c3c2b7; line-height:1.42; }
+  .card .body b { color:#ffffff; }
+  .hero-num { font-size:170px; font-weight:800; line-height:1; }
+  .hero-sub { font-size:42px; color:#c3c2b7; margin-top:10px; line-height:1.35; }
+  .mech { display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; flex:1; }
+  .mech-col { background:rgba(255,255,255,0.03); border-radius:14px; padding:22px 28px; display:flex; flex-direction:column; gap:11px; min-height:0; overflow:hidden; }
+  .mech-head { font-size:33px; font-weight:700; display:flex; align-items:center; gap:16px; }
+  .dot { width:28px; height:28px; border-radius:50%; display:inline-block; }
+  .mech-profile { font-size:38px; font-weight:800; }
+  .mech-row { font-size:28px; color:#c3c2b7; line-height:1.38; }
+  .mech-read { font-size:26px; color:#898781; font-style:italic; line-height:1.35; margin-top:auto; }
+  .footer { display:flex; align-items:center; gap:60px; margin-top:40px; }
+  .method { flex:1; font-size:31px; color:#898781; line-height:1.5; }
+  .method b { color:#c3c2b7; font-weight:600; }
+  .who { font-size:40px; color:#c3c2b7; text-align:right; line-height:1.45; }
+  .who b { color:#ffffff; font-size:44px; }
+  .qr { width:210px; height:210px; border:2px solid rgba(255,255,255,0.18); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:26px; color:#898781; text-align:center; line-height:1.3; flex:none; }
+  svg { display:block; max-width:100%; }
+  .chart-fill { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+</style></head>
+<body>
+  <div class="eyebrow"><span><b>ARM · Agent Reasoning Markup</b> — a falsifiable injection study</span><span>DEF CON 34 · AI VILLAGE · POSTER</span></div>
+  <h1>A panel is exactly as poisonable as the model in its <span class="accent">trust seat</span>.</h1>
+  <div class="subhead">Susceptibility to injected fallacies is a per-model constant — it does not change with who else is on the panel, and no sharing architecture fixed it. Pre-registered, 954 paired instances, four panel compositions.</div>
+  <div class="grid" style="grid-template-columns: 1.55fr 1fr; grid-template-rows: 0.85fr 1.15fr;">
+    <div class="card" style="grid-row:1 / span 2;">
+      <h2>Fallacy adoption per model — mixed panel vs its own monoculture</h2>
+      <div class="cap">Conclusion-only condition, measurable instances. The pair to look at: Gemini adopts at 21.0% in the mixed panel and 21.0% in its monoculture — <b>identical</b>.</div>
+      <div class="chart-fill"><svg viewBox="0 0 1900 880" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%" role="img" aria-label="Measurable conclusion-only adoption rate per model, mixed panel versus monoculture"><line x1="200" y1="680" x2="1810" y2="680" stroke="#383835" stroke-width="2"/><text x="180" y="692" fill="#898781" font-size="34" text-anchor="end">0%</text><line x1="200" y1="566" x2="1810" y2="566" stroke="#2c2c2a" stroke-width="2"/><text x="180" y="578" fill="#898781" font-size="34" text-anchor="end">5%</text><line x1="200" y1="452" x2="1810" y2="452" stroke="#2c2c2a" stroke-width="2"/><text x="180" y="464" fill="#898781" font-size="34" text-anchor="end">10%</text><line x1="200" y1="338" x2="1810" y2="338" stroke="#2c2c2a" stroke-width="2"/><text x="180" y="350" fill="#898781" font-size="34" text-anchor="end">15%</text><line x1="200" y1="224" x2="1810" y2="224" stroke="#2c2c2a" stroke-width="2"/><text x="180" y="236" fill="#898781" font-size="34" text-anchor="end">20%</text><line x1="200" y1="110" x2="1810" y2="110" stroke="#2c2c2a" stroke-width="2"/><text x="180" y="122" fill="#898781" font-size="34" text-anchor="end">25%</text><path d="M 280.3333333333333 680 L 280.3333333333333 209.48148148148152 Q 280.3333333333333 201.48148148148152 288.3333333333333 201.48148148148152 L 442.3333333333333 201.48148148148152 Q 450.3333333333333 201.48148148148152 450.3333333333333 209.48148148148152 L 450.3333333333333 680 Z" fill="#3987e5" opacity="1"/><text x="365.3333333333333" y="183.48148148148152" fill="#ffffff" font-size="40" font-weight="700" text-anchor="middle">21.0%</text><path d="M 486.3333333333333 680 L 486.3333333333333 209.48148148148152 Q 486.3333333333333 201.48148148148152 494.3333333333333 201.48148148148152 L 648.3333333333333 201.48148148148152 Q 656.3333333333333 201.48148148148152 656.3333333333333 209.48148148148152 L 656.3333333333333 680 Z" fill="#3987e5" opacity="0.62"/><text x="571.3333333333333" y="183.48148148148152" fill="#ffffff" font-size="40" font-weight="700" text-anchor="middle">21.0%</text><text x="468.3333333333333" y="744" fill="#c3c2b7" font-size="42" font-weight="600" text-anchor="middle">Gemini Flash</text><rect x="817" y="674" width="170" height="6" fill="#199e70" opacity="1"/><text x="902" y="662" fill="#ffffff" font-size="40" font-weight="700" text-anchor="middle">0.0%</text><path d="M 1023 680 L 1023 678.4602510460251 Q 1023 670.4602510460251 1031 670.4602510460251 L 1185 670.4602510460251 Q 1193 670.4602510460251 1193 678.4602510460251 L 1193 680 Z" fill="#199e70" opacity="0.62"/><text x="1108" y="652.4602510460251" fill="#ffffff" font-size="40" font-weight="700" text-anchor="middle">0.4%</text><text x="1005" y="744" fill="#c3c2b7" font-size="42" font-weight="600" text-anchor="middle">GPT-5.5</text><text x="1438.6666666666665" y="554.6" fill="#898781" font-size="30" text-anchor="middle">not in</text><text x="1438.6666666666665" y="592.6" fill="#898781" font-size="30" text-anchor="middle">mixed panel</text><rect x="1559.6666666666665" y="674" width="170" height="6" fill="#c98500" opacity="0.62"/><text x="1644.6666666666665" y="662" fill="#ffffff" font-size="40" font-weight="700" text-anchor="middle">0.0%</text><text x="1541.6666666666665" y="744" fill="#c3c2b7" font-size="42" font-weight="600" text-anchor="middle">Claude Sonnet</text><rect x="212" y="40" width="34" height="26" rx="6" fill="#c3c2b7"/><text x="260" y="62" fill="#c3c2b7" font-size="34">in the mixed panel</text><rect x="612" y="40" width="34" height="26" rx="6" fill="#c3c2b7" opacity="0.62"/><text x="660" y="62" fill="#c3c2b7" font-size="34">in its own monoculture</text></svg></div>
+      <div class="body"><b>Design rule:</b> don't put a fast-tier model in a trust-bearing seat (reconciler, vote member, summarizer). Its adoptions become the panel's output — and no panel composition dilutes them.</div>
+    </div>
+    <div class="card">
+      <h2>Sharing reasoning never amplified the attack</h2>
+      <div class="cap">Δ(C2−C1) per panel — the only significant effect is protective.</div>
+      <div class="chart-fill"><svg viewBox="0 0 1450 520" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%" role="img" aria-label="Delta C2 minus C1 per panel with 95 percent confidence intervals"><line x1="300" y1="40" x2="300" y2="440" stroke="#2c2c2a" stroke-width="2"/><text x="300" y="484" fill="#898781" font-size="26" text-anchor="middle">−0.20</text><line x1="463.33333333333337" y1="40" x2="463.33333333333337" y2="440" stroke="#2c2c2a" stroke-width="2"/><text x="463.33333333333337" y="484" fill="#898781" font-size="26" text-anchor="middle">−0.15</text><line x1="626.6666666666666" y1="40" x2="626.6666666666666" y2="440" stroke="#2c2c2a" stroke-width="2"/><text x="626.6666666666666" y="484" fill="#898781" font-size="26" text-anchor="middle">−0.10</text><line x1="790" y1="40" x2="790" y2="440" stroke="#2c2c2a" stroke-width="2"/><text x="790" y="484" fill="#898781" font-size="26" text-anchor="middle">−0.05</text><line x1="953.3333333333333" y1="40" x2="953.3333333333333" y2="440" stroke="#383835" stroke-width="3"/><text x="953.3333333333333" y="484" fill="#898781" font-size="26" text-anchor="middle">0</text><line x1="1116.6666666666665" y1="40" x2="1116.6666666666665" y2="440" stroke="#2c2c2a" stroke-width="2"/><text x="1116.6666666666665" y="484" fill="#898781" font-size="26" text-anchor="middle">+0.05</text><line x1="1280" y1="40" x2="1280" y2="440" stroke="#2c2c2a" stroke-width="2"/><text x="1280" y="484" fill="#898781" font-size="26" text-anchor="middle">+0.10</text><text x="626.6666666666666" y="523" fill="#898781" font-size="26" text-anchor="middle">← protective</text><text x="1116.6666666666665" y="523" fill="#898781" font-size="26" text-anchor="middle">amplifying →</text><line x1="368.55967078189303" y1="90" x2="852.5102880658436" y2="90" stroke="#3987e5" stroke-width="5" stroke-linecap="round"/><circle cx="610.5349794238683" cy="90" r="14" fill="#3987e5" stroke="#1a1a19" stroke-width="4"/><text x="276" y="100.5" fill="#ffffff" font-size="30" font-weight="700" text-anchor="end">all-Gemini</text><text x="872.5102880658436" y="99.1" fill="#ffffff" font-size="26" font-weight="700">Δ −0.105, p = 0.010</text><line x1="689.3602693602694" y1="190" x2="986.3299663299663" y2="190" stroke="#4a4a47" stroke-width="5" stroke-linecap="round"/><circle cx="837.8451178451178" cy="190" r="14" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="276" y="200.5" fill="#c3c2b7" font-size="30" font-weight="400" text-anchor="end">Mixed panel</text><text x="1006.3299663299663" y="199.1" fill="#898781" font-size="26" font-weight="400">Δ −0.035</text><line x1="912.3291492329149" y1="290" x2="953.3333333333333" y2="290" stroke="#4a4a47" stroke-width="5" stroke-linecap="round"/><circle cx="939.6652719665271" cy="290" r="14" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="276" y="300.5" fill="#c3c2b7" font-size="30" font-weight="400" text-anchor="end">all-GPT</text><text x="973.3333333333333" y="299.1" fill="#898781" font-size="26" font-weight="400">Δ −0.004</text><line x1="953.3333333333333" y1="390" x2="953.3333333333333" y2="390" stroke="#4a4a47" stroke-width="5" stroke-linecap="round"/><circle cx="953.3333333333333" cy="390" r="14" fill="#4a4a47" stroke="#1a1a19" stroke-width="4"/><text x="276" y="400.5" fill="#c3c2b7" font-size="30" font-weight="400" text-anchor="end">all-Claude</text><text x="973.3333333333333" y="399.1" fill="#898781" font-size="26" font-weight="400">Δ +0.000</text></svg></div>
+    </div>
+    <div class="card">
+      <h2>Three models, three mechanisms</h2>
+      <div class="cap">The TRUE-premise control separates them.</div>
+      <div class="mech">
+    <div class="mech-col">
+      <div class="mech-head"><span class="dot" style="background:#3987e5"></span>Gemini Flash</div>
+      <div class="mech-profile">Credulous adopter</div>
+      <div class="mech-row">Adopts fallacies: 21.0% (measurable C1)</div>
+      <div class="mech-row">Updates toward the TRUE premise 20/30</div>
+      <div class="mech-read">Believes what it reads — true or false.</div>
+    </div><div class="mech-col">
+      <div class="mech-head"><span class="dot" style="background:#199e70"></span>GPT-5.5</div>
+      <div class="mech-profile">Reflexive skeptic</div>
+      <div class="mech-row">Adopts fallacies: 0.4% — fully measured</div>
+      <div class="mech-row">Updates toward the TRUE premise 0/30</div>
+      <div class="mech-read">A no-update policy, not truth discrimination.</div>
+    </div><div class="mech-col">
+      <div class="mech-head"><span class="dot" style="background:#c98500"></span>Claude Sonnet</div>
+      <div class="mech-profile">Zero adoption</div>
+      <div class="mech-row">Adopts fallacies: 0 in 480 instances</div>
+      <div class="mech-row">TRUE-premise cell blind (baseline already agreed)</div>
+      <div class="mech-read">Never adopts falsehood; truth-updating untestable.</div>
+    </div>
+  </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="method">
+      <b>Method:</b> pre-registered (dated commit, before the data existed) · 4 panel compositions · <b>954 paired subject-instances</b> · 8 logical-fallacy injections (authored, truth value known) + 1 true-premise control · 15 reps ·
+      claude-sonnet-4-6 / gpt-5.5-2026-04-23 / gemini-3.5-flash · scorer, statistics &amp; full audit trail open-source.
+      All numbers post-audit: measurable-only denominators, marker false-positives corrected.
+    </div>
+    <div class="qr">QR<br/>(repo link —<br/>after CFP)</div>
+    <div class="who"><b>Erik Roed</b><br/>ARM Protocol v0.9<br/>arm-c1-vs-c2-injection</div>
+  </div>
+</body></html>
