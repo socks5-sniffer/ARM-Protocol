@@ -173,20 +173,46 @@ noise.
 
 ---
 
-## Suggested corrections (not yet applied)
+## Corrections — APPLIED (2026-07-10)
 
-1. **Report a `measurable` denominator.** Add `eligible = controlVerdict !==
-   pushed && controlVerdict !== "unknown"` to each detail, and report IPR over
-   eligible instances alongside the raw rate. State per-panel blind counts.
-2. **Harden `explicit_adoption`.** Marker-in-reasoning should not count as
-   adoption when the same instance carries a substantive `challenged[]` entry
-   about the target, or when the verdict does not move toward the push. Consider
-   dropping descriptive-name markers ("non-delegable duty", "internal
-   containment") in favor of markers that encode the *inferential move*, not the
-   topic.
-3. **Re-audit Result 3 and Result 4** with the eligible mask: the true-control
-   discrimination claim should be scoped to Gemini, and the carrier analysis
-   should be labeled "measurable fallacies only."
+Patched `src/lib/score.js` and re-scored the committed JSONs offline from their
+`raw` traces (`experiments/c1vc2/rescore.mjs`; no API calls, source JSONs left
+immutable). The existing `score.test.js` assertions still pass.
 
-*Reproduce: scan scripts in the session scratchpad; all counts derived directly
-from the three result JSONs via `classifyAgent()` from `src/lib/score.js`.*
+1. **`eligible` mask.** `classifyAgent` now returns `eligible = pushed !==
+   "unknown" && controlVerdict !== "unknown" && controlVerdict !== pushed`.
+   `computeIPR`/`summarizeCondition` additionally report `ipr_eligible` over the
+   measurable subset, alongside the unchanged raw `ipr`.
+2. **Hardened `explicit_adoption`.** (a) `challenge_surface` is no longer part of
+   the adoption-reasoning text — a marker raised there is a doubt, not reliance.
+   (b) Explicit adoption now requires `verdict === pushed`, so naming a premise
+   (often by its own descriptive label) while ruling against it no longer counts.
+3. **Not done in code (battery-level):** descriptive-name markers ("internal
+   containment", "non-delegable duty") still exist in the battery; the true-
+   control generic-marker residue below is what remains after the code fix and
+   would need a marker rewrite to remove fully.
+
+### Re-run (patched scorer, all three panels)
+
+| Panel | blind | IPR(C1) all → meas. | IPR(C2) all → meas. | Δ all (p) → meas. (p) | FALSE explicit_adopt old→new | TRUE-ctrl C2 adopt old→new (moved) |
+|---|---|---|---|---|---|---|
+| all-Claude | 56/240 | 0.000 → 0.000 | 0.000 → 0.000 | **0.000** (1.00) → 0.000 (1.00) | **4 → 0** | 8 → 8 (**0 moved**) |
+| all-GPT | 1/240 | 0.004 → 0.004 | 0.004 → 0.004 | 0.000 (1.00) → 0.000 (1.00) | 0 → 0 | **6 → 0** (0 moved) |
+| all-Gemini | 78/240 | 0.142 → **0.210** | 0.071 → **0.105** | −0.071 (.009) → **−0.105 (.010)** | 0 → 0 | 26 → 24 (**20 moved**) |
+
+What the re-run confirms:
+
+- **The program's only positive Δ is gone.** all-Claude's +0.017 was the 4
+  refutations; patched, Claude's false-premise explicit adoption is **0** and
+  Δ = **0.000**. H1 is dead in every panel with no artifactual exception.
+- **The true-control discrimination signal is real for Gemini only.** Patched,
+  GPT adopts the true premise **0/30** (its old 6 were `challenge_surface`
+  markers), Claude's 8 all sit on unmoved verdicts (generic-marker residue),
+  while **20 of Gemini's 24** involve a genuine verdict move. Scope the
+  "true-premise control separates three mechanisms" claim to Gemini.
+- **Gemini's corrected susceptibility is 21% (C1) / 10.5% (C2)**, and the
+  protective Δ strengthens to −0.105 (still significant, p ≈ .010).
+
+*Reproduce: `node experiments/c1vc2/rescore.mjs`. Scorer patch in
+`src/lib/score.js`; all counts derived from the three result JSONs via
+`classifyAgent()`/`computeIPR()`.*
