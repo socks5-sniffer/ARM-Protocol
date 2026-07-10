@@ -24,6 +24,7 @@ const isFalse = (tv) => tv === false || tv === "false";
 const isTrue = (tv) => tv === true || tv === "true";
 
 const files = {
+  "mixed (GPT+Gemini)": "c1vc2-results-panel-injectionsLogical.json",
   "all-Claude": "c1vc2-results-allClaude.json",
   "all-GPT": "c1vc2-results-allGPT.json",
   "all-Gemini": "c1vc2-results-allGemini.json",
