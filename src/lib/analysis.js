@@ -17,7 +17,8 @@ export function driftLabel(delta) {
     : Number(String(delta).replace(/[−–—]/g, "-").trim());
   if (!Number.isFinite(n)) return { label: "⚠ invalid delta", color: "#e05252" };
   if (n < DRIFT_DOWN_THRESHOLD) return { label: "large downward shift", color: "#3dbf7a" };
-  if (n <= 0) return { label: "downward shift", color: "#3dbf7a" };
+  if (n === 0) return { label: "no shift", color: "#5a6480" }; // zero is not a shift
+  if (n < 0) return { label: "downward shift", color: "#3dbf7a" };
   if (n <= DRIFT_UP_THRESHOLD) return { label: "minor shift", color: "#5a6480" };
   return { label: "upward shift", color: "#c9a227" };
 }

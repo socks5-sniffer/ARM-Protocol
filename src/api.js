@@ -3,17 +3,19 @@ import { PROVIDER_MODEL } from "./config.js";
 
 // ─── Proxy auth ─────────────────────────────────────────────────────────────
 // The production server (server.js) gates /api/* behind a shared access token.
-// The token is supplied at runtime and kept in localStorage so it is never baked
-// into the static bundle. It is sent as a custom header that the proxy strips
-// before forwarding the request upstream to the providers.
+// The token is supplied at runtime (typed into the UI) and kept in localStorage
+// ONLY — there is deliberately no VITE_* env fallback, because anything
+// VITE_-prefixed is inlined into the static bundle at build time and would ship
+// the token to every visitor. It is sent as a custom header that the proxy
+// strips before forwarding the request upstream to the providers.
 function authHeaders() {
   let token = "";
   try {
     token = (typeof localStorage !== "undefined" && localStorage.getItem("arm_access_token")) || "";
   } catch {
-    /* localStorage unavailable (e.g. private mode) — fall through */
+    /* localStorage unavailable (e.g. private mode) — token stays empty; the
+       server responds 401 and the operator pastes it into the UI field. */
   }
-  if (!token) token = import.meta.env.VITE_ARM_ACCESS_TOKEN || "";
   return token ? { "x-arm-token": token } : {};
 }
 
@@ -67,7 +69,9 @@ async function callClaude(systemPrompt, userMessage, maxTokens, onRetry) {
         messages: [{ role: "user", content: userMessage }],
       }),
     });
-    return { res, data: await res.json() };
+    // Non-JSON error bodies (e.g. an HTML 502 page from the proxy) must not be
+    // misreported as network errors — fall back to {} and let the status speak.
+    return { res, data: await res.json().catch(() => ({})) };
   }, onRetry);
 
   if (!res.ok || data.error) {
@@ -77,6 +81,8 @@ async function callClaude(systemPrompt, userMessage, maxTokens, onRetry) {
 
   return {
     raw: data.content?.map((b) => b.text || "").join("") || "",
+    // Anthropic natively reports "max_tokens" on truncation — already the
+    // provider-neutral value safeParseTrace checks; no mapping needed.
     stopReason: data.stop_reason || "unknown",
     usage: data.usage || {},
     provider: "claude",
@@ -107,7 +113,7 @@ async function callGPT(systemPrompt, userMessage, maxTokens, onRetry) {
         ],
       }),
     });
-    return { res, data: await res.json() };
+    return { res, data: await res.json().catch(() => ({})) };
   }, onRetry);
 
   if (!res.ok || data.error) {
@@ -117,7 +123,13 @@ async function callGPT(systemPrompt, userMessage, maxTokens, onRetry) {
 
   return {
     raw: data.choices?.[0]?.message?.content || "",
-    stopReason: data.choices?.[0]?.finish_reason || "unknown",
+    // OpenAI reports finish_reason "length" on truncation; map it to the
+    // provider-neutral "max_tokens" that safeParseTrace checks (Gemini gets the
+    // same normalization below — Anthropic already emits it natively).
+    stopReason:
+      data.choices?.[0]?.finish_reason === "length"
+        ? "max_tokens"
+        : data.choices?.[0]?.finish_reason || "unknown",
     usage: data.usage || {},
     provider: "gpt",
     model: PROVIDER_MODEL.gpt,
@@ -143,7 +155,7 @@ async function callGemini(systemPrompt, userMessage, maxTokens, onRetry) {
         }),
       }
     );
-    return { res, data: await res.json() };
+    return { res, data: await res.json().catch(() => ({})) };
   }, onRetry);
 
   if (!res.ok) {

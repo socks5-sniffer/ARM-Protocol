@@ -187,7 +187,7 @@ describe('safeParseTrace — failure capture', () => {
     const { ok, trace, error } = safeParseTrace(raw('I refuse to answer in JSON.'), 'alpha');
     expect(ok).toBe(false);
     expect(trace._ok).toBe(false);
-    expect(trace.claim).toBe('[parse failed]');
+    expect(trace.claim).toBe('[PARSE FAILED]'); // matches the sentinel guarded in analysis.js/score.js
     expect(trace.confidence).toBeNull();
     expect(trace.flags).toContain('serialization_failure');
     expect(trace.raw_reasoning_attempt).toBe('I refuse to answer in JSON.');

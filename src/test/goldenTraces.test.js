@@ -52,7 +52,11 @@ describe('trace/v0.9 golden traces', () => {
 
     it('stored TF-IDF convergence reproduces from the R1 claims', () => {
       if (data.tfidf_convergence == null) return; // not recorded on this run
-      const recomputed = computeTFIDFCosine(r1Agents(data));
+      // arm-trace-v1.2 recorded the unsmoothed formula (idf = log(N/df), which
+      // zeroes universally-shared terms); v1.3+ records the smoothed one. Recompute
+      // each trace with the formula that produced it so published numbers stay pinned.
+      const smoothIdf = data.schema_version !== 'arm-trace-v1.2';
+      const recomputed = computeTFIDFCosine(r1Agents(data), { smoothIdf });
       expect(recomputed).toBeCloseTo(data.tfidf_convergence, 12);
     });
 

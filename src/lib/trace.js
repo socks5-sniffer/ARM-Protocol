@@ -15,7 +15,14 @@ export function safeParseTrace(rawResult, agentId) {
   const truncated = stopReason === "max_tokens";
   const _meta = { stopReason, usage, provider, model, latencyMs };
   try {
-    let cleaned = (raw || "").replace(/```json|```/g, "").trim();
+    // Strip ONLY leading/trailing markdown fences — a global replace would mangle
+    // legitimate backticks inside JSON string values. Mid-prose fences fall through
+    // to JSON.parse failure and are handled by the caller's fallback.
+    let cleaned = String(raw || "")
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/, "")
+      .trim();
     // Fix Gemini serialization bug: strip stray double-quote before property keys
     cleaned = cleaned.replace(/""([^"]+)":/g, '"$1":');
     const parsed = JSON.parse(cleaned);
@@ -88,9 +95,11 @@ export function safeParseTrace(rawResult, agentId) {
     if (truncated) flags.push("truncation_detected");
     return {
       ok: false,
-      // No magic-string sentinel — failure is signalled out of band via _ok:false.
+      // Failure is signalled out of band via _ok:false; the claim text is a
+      // display placeholder. Uppercase to match the "[PARSE FAILED]" sentinel
+      // guarded in analysis.js/score.js and emitted by the c1vc2 harness.
       trace: {
-        claim: "[parse failed]",
+        claim: "[PARSE FAILED]",
         confidence: null,
         reconciliation_status: "failed",
         failure_reason: truncated
@@ -136,9 +145,13 @@ export function computeConvergence(traces) {
 }
 
 // ─── TF-IDF cosine convergence ────────────────────────────────────────────────
-// IDF down-weights terms shared by all agents (no discriminating signal) toward zero.
-// Threshold is the same as Jaccard (> 0.4 = warn) — lexical domain, same scale.
-export function computeTFIDFCosine(traces) {
+// Smoothed IDF (log(N/df) + 1): terms shared by all agents keep weight 1 instead
+// of being zeroed, so the score behaves as a convergence alarm — identical claims
+// score 1, and the > 0.4 warn threshold is reachable. The unsmoothed v1.2 formula
+// (log(N/df), which zeroes universally-shared terms and makes any 2-doc pair — and
+// even identical claims — score 0) is kept behind { smoothIdf: false } so numbers
+// published from arm-trace-v1.2 exports remain reproducible (goldenTraces.test.js).
+export function computeTFIDFCosine(traces, { smoothIdf = true } = {}) {
   const claims = traces
     .filter((t) => t && t._ok !== false && typeof t.claim === "string" && t.claim)
     .map((t) => t.claim.toLowerCase());
@@ -159,7 +172,8 @@ export function computeTFIDFCosine(traces) {
     for (const t of terms) tf.set(t, (tf.get(t) || 0) + 1);
     const vec = new Map();
     for (const [term, count] of tf) {
-      vec.set(term, (count / terms.length) * Math.log(N / df.get(term)));
+      const idf = Math.log(N / df.get(term)) + (smoothIdf ? 1 : 0);
+      vec.set(term, (count / terms.length) * idf);
     }
     return vec;
   });

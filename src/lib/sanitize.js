@@ -111,9 +111,12 @@ export function scanForInjection(value) {
 const CAP_MARKER = "…[capped]";
 // Cap a string to at most `max` characters *including* the truncation marker, so the
 // result never exceeds the bound (the marker is not appended on top of a full `max`).
+// When max is too small to fit the marker itself, hard-truncate without it — the
+// bound wins over the marker.
 function capLen(s, max) {
   if (typeof s !== "string" || s.length <= max) return s;
-  return s.slice(0, Math.max(0, max - CAP_MARKER.length)) + CAP_MARKER;
+  if (max <= CAP_MARKER.length) return s.slice(0, max);
+  return s.slice(0, max - CAP_MARKER.length) + CAP_MARKER;
 }
 
 function capItems(arr, maxItems, itemMax) {

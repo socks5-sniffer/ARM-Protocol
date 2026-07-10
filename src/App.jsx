@@ -298,7 +298,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       };
       setR2((prev) => ({ ...prev, gamma: pG2.trace }));
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      setRunMeta({
+      const fapRunMeta = {
         schema_version: EXPORT_SCHEMA_VERSION,
         duration: elapsed,
         roleInjection,
@@ -308,12 +308,43 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         silentConfidence: null,
         silentBaselineFailed: true,
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
+        polarity_gate_fired: false,
+        verdict_shift_flagged: false,
+        gamma_drift_exceeded: false,
         disagreement: null,
         convergence: conv,
         tfidf_convergence: tfidfConv,
         embedding_convergence: embedConv,
         self_check_divergence: selfCheckDivergence,
+      };
+      setRunMeta(fapRunMeta);
+      // Partial runs are records too — auto-save with a "-fap" filename suffix so
+      // the aborted reconciliation is preserved without operator intervention.
+      const fapFilename = buildFilename({
+        version: ARM_VERSION,
+        questionId,
+        providers,
+        roleInjection,
+        silentAgent,
+        status: "fap",
       });
+      const fapSaved = await saveTrace(
+        {
+          arm_version: ARM_VERSION,
+          schema_version: EXPORT_SCHEMA_VERSION,
+          r1: { alpha: pA1.trace, beta: pB1.trace, gamma: pG1.trace, silent: pSilent.trace },
+          r2: { alpha: pA2.trace, beta: pB2.trace, gamma: pG2.trace },
+          convergence: conv,
+          tfidf_convergence: tfidfConv,
+          embedding_convergence: embedConv,
+          runMeta: fapRunMeta,
+          question,
+          providers,
+        },
+        fapFilename,
+        accessToken
+      );
+      addLog(fapSaved ? `Auto-saved (partial): ${fapFilename}` : `Auto-save failed (server unreachable?) — use Export to save manually`);
       setStatus("done");
       addLog(`Run complete (partial — FAP) in ${elapsed}s`);
       return;
@@ -352,8 +383,14 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         pG2.trace.polarity_gate_fired = true;
         // Self-documenting audit block: the flip explains itself downstream.
         // confidence_delta_blindspot — true when the flip was invisible to magnitude
-        // detectors (|Δ| within DRIFT_UP_THRESHOLD); false when FAP/gamma_drift also caught it.
-        const gammaDelta = typeof pG2.trace.self_delta_vs_baseline === "number"
+        // detectors (|Δ| within DRIFT_UP_THRESHOLD). Keyed off the HARNESS-computed
+        // delta (C_gamma_R2 − C_silent), never the model's self-report — a model that
+        // misreports its own delta must not be able to shape its audit record. The
+        // self-report is preserved alongside for comparison.
+        const harnessGammaDelta = Number.isFinite(pG2.trace.harness_self_delta_vs_baseline)
+          ? pG2.trace.harness_self_delta_vs_baseline
+          : null;
+        const selfReportedGammaDelta = typeof pG2.trace.self_delta_vs_baseline === "number"
           ? pG2.trace.self_delta_vs_baseline
           : (typeof pG2.trace.drift_score?.confidence_delta === "number" ? pG2.trace.drift_score.confidence_delta : null);
         pG2.trace.polarity_audit = {
@@ -361,7 +398,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           gamma_silent_polarity:  extractVerdict(pSilent.trace),
           gamma_r2_polarity:      r2Dir,
           polarity_changed:       true,
-          confidence_delta_blindspot: gammaDelta !== null && Math.abs(gammaDelta) <= DRIFT_UP_THRESHOLD,
+          harness_self_delta:     harnessGammaDelta,
+          self_reported_delta:    selfReportedGammaDelta,
+          confidence_delta_blindspot: harnessGammaDelta !== null && Math.abs(harnessGammaDelta) <= DRIFT_UP_THRESHOLD,
           gate_action:            "block_clean_success",
           requires_manual_review: true,
         };
@@ -388,10 +427,11 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         addLog(`⚠ verdict shift: Gamma ${r1Dir.toUpperCase()}→${r2Dir.toUpperCase()} — advisory flag (not the polarity gate)`);
       }
       // Gamma drift diagnostic — logged only. Like the Alpha/Beta confidence-drift
-      // flag, self_delta magnitude is not a validated signal (see experiments/c1vc2);
-      // recorded as a breadcrumb, not an authoritative flag.
-      if (typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD) {
-        addLog(`ℹ Gamma self-Δ > +${DRIFT_UP_THRESHOLD} (${pG2.trace.self_delta_vs_baseline.toFixed(3)}) — logged diagnostic only`);
+      // flag, delta magnitude is not a validated signal (see experiments/c1vc2);
+      // recorded as a breadcrumb, not an authoritative flag. Keyed off the
+      // harness-computed delta, not the model's self-report.
+      if (Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD) {
+        addLog(`ℹ Gamma harness self-Δ > +${DRIFT_UP_THRESHOLD} (${pG2.trace.harness_self_delta_vs_baseline.toFixed(3)}) — logged diagnostic only`);
       }
     }
 
@@ -409,7 +449,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
       verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
-      gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
+      gamma_drift_exceeded: pG2.ok && Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
       tfidf_convergence: tfidfConv,
@@ -443,7 +483,8 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         silentConfidence: pSilent.trace.confidence,
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
         polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
-        gamma_drift_exceeded: pG2.ok && typeof pG2.trace.self_delta_vs_baseline === "number" && pG2.trace.self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
+        verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
+        gamma_drift_exceeded: pG2.ok && Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
         disagreement: pG2.trace.disagreement_classification,
         convergence: conv,
         tfidf_convergence: tfidfConv,
@@ -735,7 +776,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v{ARM_VERSION}: confidence Δ is descriptive only (unvalidated — AUC ≈ 0.44 as a detector; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ ≤ 0 = downward shift · the polarity/verdict-flip gate is the detector<br/>
+            v{ARM_VERSION}: confidence Δ is descriptive only (unvalidated — AUC ≈ 0.44 as a detector; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ &lt; 0 = downward shift · Δ = 0 = no shift · the polarity/verdict-flip gate is the detector<br/>
             Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>

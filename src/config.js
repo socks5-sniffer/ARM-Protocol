@@ -44,7 +44,9 @@ export const DRIFT_DOWN_THRESHOLD = -0.15;  // lower edge → "large downward sh
 export const VALID_DISAGREEMENT   = ["none", "information", "reasoning", "values"];
 export const VALID_RECON_STATUS   = ["success", "failed", "gamma_flip_detected"];
 export const DELTA_MISMATCH_EPS   = 0.02; // |model self-report − harness-computed| beyond this → flagged
-export const EXPORT_SCHEMA_VERSION = "arm-trace-v1.2";
+// v1.3: tfidf_convergence now uses smoothed IDF (log(N/df)+1 — identical claims
+// score 1, not 0); v1.2 numbers reproduce via computeTFIDFCosine(..., {smoothIdf:false}).
+export const EXPORT_SCHEMA_VERSION = "arm-trace-v1.3";
 
 // Protocol version — single source of truth. Rendered in the UI header, embedded
 // in every exported/auto-saved trace as `arm_version`, and used for trace filenames.

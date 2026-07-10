@@ -17,7 +17,9 @@ export async function exportJSON(data) {
   a.href = url;
   a.download = `arm-v${ARM_VERSION}-run-${Date.now()}.json`;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Delay revocation: revoking on the next tick can abort the download in slower
+  // browsers — the click only enqueues it. 10s is comfortably past any enqueue.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export { EXPORT_SCHEMA_VERSION };
