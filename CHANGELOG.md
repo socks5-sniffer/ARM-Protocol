@@ -9,6 +9,34 @@ trace-schema changes.
 
 ## [Unreleased]
 
+### Changed
+- **Polarity gate now resolves its baseline against a Gamma R1 *consensus*.** The
+  gate previously compared Gamma R2 against the visible R1 draw (`pG1`) alone —
+  but R2 is prompted with the *silent* baseline as its prior, and the two draws
+  are independent stochastic samples that disagree from ordinary generation
+  noise. A new `classifyGammaPolarity()` helper (`src/lib/analysis.js`) splits on
+  whether the two draws agree:
+  - **Both agree** → gate compares R2 against that consensus; a flip contradicts
+    *both* independent statements of Gamma's prior (the strong signal). Fires
+    exactly as before (`polarity_audit`, manual review).
+  - **They disagree** → the model's own prior is a coin flip on this question, so
+    a "flip" is undefined. The gate is **not evaluated**; instead a
+    `baseline_unstable` advisory is written (`requires_manual_review: false`) with
+    an amber UI badge. No status override.
+  - **Rotated silent baseline (`silentAgent ≠ gamma`) or an unparseable verdict**
+    → consensus is undefined, so the gate falls back to the legacy
+    visible-R1-only comparison and records `baseline_mode: "visible_r1_only"` in
+    the audit (the pre-existing cross-agent-comparison caveat, B1, is unchanged
+    and now explicitly labeled rather than silent).
+  The `polarity_audit` block gains `baseline_mode`, `baselines_agree`, and
+  `silent_agent`; `runMeta` gains `baseline_unstable`. On the committed traces
+  this reclassifies the 9 rotated-baseline firings as legacy-fallback and leaves
+  all 10 default-config firings (genuine consensus reversals) firing unchanged.
+- **`verdict` is now schema-validated at parse time.** A missing or out-of-enum
+  `verdict` is a non-fatal `schema_warnings` entry (`verdict_missing_or_invalid`)
+  rather than passing silently — the field is load-bearing for the polarity gate,
+  and without it `extractVerdict` degrades to brittle claim-text regex parsing.
+
 ### Added
 - **Verdict-shift advisory flag.** A signal weaker than the polarity gate: when the
   Gamma reconciler's verdict moves *involving* `conditional` (a firm `yes`/`no`

@@ -37,6 +37,11 @@ export function GammaCard({ trace }) {
             ⚑ verdict shift {String(trace.verdict_shift.gamma_r1_verdict).toUpperCase()}→{String(trace.verdict_shift.gamma_r2_verdict).toUpperCase()}
           </Tag>
         )}
+        {trace.baseline_unstable && (
+          <Tag color={C.silent} bg={C.silent + "18"}>
+            ⚠ unstable R1 baseline {String(trace.baseline_unstable.gamma_r1_polarity).toUpperCase()}≠{String(trace.baseline_unstable.gamma_silent_polarity).toUpperCase()} — gate not evaluated
+          </Tag>
+        )}
       </div>
 
       {(providerTag || modelTag) && (

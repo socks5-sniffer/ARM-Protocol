@@ -32,7 +32,7 @@ import {
   deltaMismatch,
 } from "./lib/trace.js";
 import { peerTracesBlock, questionBlock } from "./lib/sanitize.js";
-import { driftLabel, extractVerdict, classifyVerdictTransition } from "./lib/analysis.js";
+import { driftLabel, extractVerdict, classifyGammaPolarity } from "./lib/analysis.js";
 import { C, f } from "./theme.js";
 import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
@@ -310,6 +310,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
         polarity_gate_fired: false,
         verdict_shift_flagged: false,
+        baseline_unstable: false,
         gamma_drift_exceeded: false,
         disagreement: null,
         convergence: conv,
@@ -368,17 +369,39 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       addLog(`Gamma harness self-Δ vs silent: ${harnessSelfDelta ?? "?"} (model self-report: ${pG2.trace.self_delta_vs_baseline ?? "?"})${pG2.trace.self_delta_mismatch ? " ⚠ mismatch" : ""}`);
     }
 
-    // Polarity Gate: detect verdict-direction flip between Gamma R1 and R2.
-    // This is the PRIMARY drift detector: in the c1vc2 ground-truth run the
-    // verdict-flip signal caught 30 of 33 real adoptions while the confidence
-    // magnitude flag caught 0. Prefer the structured `verdict` field via
-    // extractVerdict; treat anything that isn't a firm yes/no (conditional /
-    // unknown) as non-firing, preserving the gate's yes↔no polarity semantics.
+    // Polarity Gate: detect a verdict-direction flip in the Gamma reconciler.
+    // This is the PRIMARY drift detector. WHAT R2 is compared against is decided
+    // by classifyGammaPolarity (lib/analysis.js): when Gamma's two independent
+    // R1 draws (visible R1 + silent baseline) AGREE, R2 is gated against that
+    // consensus prior — a flip there contradicts both draws, the strong signal.
+    // When they DISAGREE, the model's own prior is a coin flip on this question,
+    // so instead of firing a false MANUAL REVIEW the harness raises a
+    // baseline-instability advisory and skips the gate. With a rotated silent
+    // baseline (silentAgent ≠ gamma) or an unparseable verdict, it falls back to
+    // the legacy visible-R1-only comparison and records that mode in the audit.
     if (pG2.ok) {
       const r1Dir = extractVerdict(pG1.trace);
+      const silentDir = extractVerdict(pSilent.trace);
       const r2Dir = extractVerdict(pG2.trace);
-      const transition = classifyVerdictTransition(r1Dir, r2Dir);
-      if (transition === "flip") {
+      const { mode: baselineMode, baselinesAgree, transition } = classifyGammaPolarity({
+        r1: r1Dir,
+        silent: silentDir,
+        r2: r2Dir,
+        silentIsGamma: silentAgent === "gamma",
+      });
+      if (baselineMode === "unstable") {
+        // Gamma's own R1 is split (visible draw ≠ silent draw). A "flip" is not a
+        // well-defined event against a coin-flip prior — the informative fact is
+        // the instability itself. Advisory only: no status override, no gate.
+        pG2.trace.baseline_unstable = {
+          gamma_r1_polarity:      r1Dir,
+          gamma_silent_polarity:  silentDir,
+          gamma_r2_polarity:      r2Dir,
+          requires_manual_review: false,
+          note: `Gamma's two independent R1 draws disagreed (visible ${r1Dir.toUpperCase()} vs silent ${silentDir.toUpperCase()}) — this question is contested for this model, so polarity-flip detection is unreliable and the gate was not evaluated.`,
+        };
+        addLog(`⚠ unstable R1 baseline: Gamma's visible R1 (${r1Dir.toUpperCase()}) and silent baseline (${silentDir.toUpperCase()}) disagree — contested question; polarity gate not evaluated`);
+      } else if (transition === "flip") {
         pG2.trace.reconciliation_status = "gamma_flip_detected";
         pG2.trace.polarity_gate_fired = true;
         // Self-documenting audit block: the flip explains itself downstream.
@@ -395,9 +418,15 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           : (typeof pG2.trace.drift_score?.confidence_delta === "number" ? pG2.trace.drift_score.confidence_delta : null);
         pG2.trace.polarity_audit = {
           gamma_r1_polarity:      r1Dir,
-          gamma_silent_polarity:  extractVerdict(pSilent.trace),
+          gamma_silent_polarity:  silentDir,
           gamma_r2_polarity:      r2Dir,
           polarity_changed:       true,
+          // How the baseline was resolved: "consensus" = R2 contradicts BOTH of
+          // Gamma's independent R1 draws; "visible_r1_only" = legacy comparison
+          // (rotated silent baseline or unparseable verdict — consensus undefined).
+          baseline_mode:          baselineMode,
+          baselines_agree:        baselinesAgree,
+          silent_agent:           silentAgent,
           harness_self_delta:     harnessGammaDelta,
           self_reported_delta:    selfReportedGammaDelta,
           confidence_delta_blindspot: harnessGammaDelta !== null && Math.abs(harnessGammaDelta) <= DRIFT_UP_THRESHOLD,
@@ -449,6 +478,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
       verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
+      baseline_unstable: pG2.trace.baseline_unstable ? true : false,
       gamma_drift_exceeded: pG2.ok && Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
@@ -484,6 +514,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
         polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
         verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
+        baseline_unstable: pG2.trace.baseline_unstable ? true : false,
         gamma_drift_exceeded: pG2.ok && Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
         disagreement: pG2.trace.disagreement_classification,
         convergence: conv,

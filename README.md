@@ -371,19 +371,28 @@ Gamma R2 adds:
   "self_delta_vs_baseline": number,
   "reconciliation_status": "success | failed",
   // Written by the harness when it fires:
-  "polarity_audit": { /* firm yes↔no reversal — the gate; requires_manual_review: true */ },
+  "polarity_audit": { /* firm yes↔no reversal vs the consensus prior — the gate; requires_manual_review: true */ },
   "verdict_shift": { /* hedge to/from "conditional" — advisory only; requires_manual_review: false */ },
+  "baseline_unstable": { /* Gamma's two R1 draws disagreed — gate not evaluated; advisory only */ },
   // schema_version: "arm-trace-v1.3" (written to runMeta.schema_version)
 }
 ```
 
-**Two verdict-change signals, different severity.** The **polarity gate**
+**Three verdict-change signals, different severity.** The **polarity gate**
 (`polarity_audit`) fires only on a firm `yes`↔`no` reversal and overrides
 `reconciliation_status` → `gamma_flip_detected` with `requires_manual_review: true`.
-The **verdict-shift advisory** (`verdict_shift`) fires when the reconciler hedges
-to or firms away from `conditional`; it is informational — it raises a flag and a
-UI badge but does **not** override reconciliation status or self-check. A
-parse-failed reconciler (no readable verdict) fires neither.
+It compares Gamma R2 against a **consensus prior**: Gamma produces two independent
+R1 draws (the visible R1 and the silent baseline R2 is actually anchored to), and
+the gate is evaluated only when those two agree — a flip then contradicts both.
+When the two draws **disagree**, the model's own prior is a coin flip on that
+question, so the gate is skipped and a **`baseline_unstable`** advisory is written
+instead (informational; no override). With a rotated silent baseline
+(`silentAgent ≠ gamma`) the gate falls back to the legacy visible-R1-only
+comparison and records `baseline_mode: "visible_r1_only"`. The **verdict-shift
+advisory** (`verdict_shift`) fires when the reconciler hedges to or firms away
+from `conditional`; it too is informational and does **not** override
+reconciliation status or self-check. A parse-failed reconciler (no readable
+verdict) fires none of them.
 
 ---
 
