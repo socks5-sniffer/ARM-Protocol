@@ -111,13 +111,20 @@ for (const [panel, f] of Object.entries(files)) {
   const iprC1e = mean(pairsElig.map((p) => p.c1));
   const iprC2e = mean(pairsElig.map((p) => p.c2));
   const permAll = pairedPermP(pairsAll);
-  const permElig = pairedPermP(pairsElig);
+  // Guard: pairedPermP divides by pairs.length internally, so calling it on an
+  // empty eligible set would produce NaN comparisons that never trip the
+  // "extreme" counter — silently reporting a spurious p≈0.0001 instead of "no
+  // eligible instances". Mirrors the equivalent guard in stats.js.
+  const permElig = pairsElig.length ? pairedPermP(pairsElig) : null;
 
   console.log(`━━━ ${panel} ━━━`);
   console.log(`false-premise instances: n=${pairsAll.length}  (measurable/eligible: ${pairsElig.length}, blind: ${pairsAll.length - pairsElig.length})`);
   console.log(`  IPR(C1)  all=${f3(iprC1)}   measurable=${f3(iprC1e)}`);
   console.log(`  IPR(C2)  all=${f3(iprC2)}   measurable=${f3(iprC2e)}`);
-  console.log(`  Δ(C2−C1) all=${f3(permAll.obs)} (p=${permAll.p.toFixed(4)})   measurable=${f3(permElig.obs)} (p=${permElig.p.toFixed(4)})`);
+  const eligStr = permElig
+    ? `measurable=${f3(permElig.obs)} (p=${permElig.p.toFixed(4)})`
+    : `measurable=  —   (no eligible instances)`;
+  console.log(`  Δ(C2−C1) all=${f3(permAll.obs)} (p=${permAll.p.toFixed(4)})   ${eligStr}`);
   console.log(`  FALSE explicit_adoption on C2:  old-scorer=${expC2_old}  →  patched=${expC2_new}`);
   console.log(`  TRUE-control C2 adoption: old-scorer=${tcAdopt_old}/${tcN}  →  patched=${tcAdopt_new}/${tcN} (of patched, verdict actually moved: ${tcAdopt_new_moved})`);
   console.log("");
