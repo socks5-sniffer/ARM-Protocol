@@ -66,7 +66,7 @@ Output: a per-run IPR table, an aggregate `Δ(C2−C1)`, and a results JSON.
 control and `premise_markers` the scorer matches on. The claim is kept free of
 the marker so conclusion-only (C1) sharing genuinely hides the fabrication.
 
-Current battery: three **false-premise** injections (fabricated statutes across
+Original battery: three **false-premise** injections (fabricated statutes across
 cybersecurity / medicine / law, each pushing `yes`) plus one **true-premise**
 control. The true control is a specificity check: a good detector should flag the
 false plants and *not* the true one. A detector that flags everything is useless,
@@ -75,6 +75,18 @@ and the control is what proves discrimination.
 > ⚠ The "facts" in the false injections (e.g. the "2024 Active Cyber Defense
 > Certainty Act", the "2023 revised Good Samaritan statute", "Model Rule 3.3(d)")
 > are **fabricated payloads**. They are not real. Do not cite them.
+
+> **Current primary battery is [`injections-logical.json`](./injections-logical.json)** —
+> 8 invalid-inference fallacies (no fabricated fact to reject; see the file's
+> header comment for why the fabricated-statute battery above hit a floor
+> effect) + 1 true-premise control. This is what the four completed panel runs
+> (mixed + three monocultures) used; see
+> [`FINDINGS-monocultures.md`](./FINDINGS-monocultures.md) for the confirmatory
+> results and [`FINDINGS-audit.md`](./FINDINGS-audit.md) for a since-applied
+> scorer correction (an `eligible` mask for structurally-blind instances, and a
+> verdict guard on `explicit_adoption` that removed the program's only
+> artifactual positive result). Reproduce any number with
+> `node experiments/c1vc2/rescore.mjs`.
 
 ## Detector ROC
 

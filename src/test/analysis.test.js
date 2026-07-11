@@ -23,9 +23,9 @@ describe('driftLabel', () => {
     expect(driftLabel(DRIFT_DOWN_THRESHOLD - 0.001).label).toBe('large downward shift');
     // Exactly at the down threshold is NOT large — n < threshold is strict
     expect(driftLabel(DRIFT_DOWN_THRESHOLD).label).toBe('downward shift');
-    // Any non-positive delta reads as a downward shift
+    // Negative deltas read as a downward shift; exactly zero is not a shift at all
     expect(driftLabel(-0.05).label).toBe('downward shift');
-    expect(driftLabel(0).label).toBe('downward shift');
+    expect(driftLabel(0).label).toBe('no shift');
     // (0, DRIFT_UP_THRESHOLD] → minor shift; exactly at threshold is still minor
     expect(driftLabel(0.01).label).toBe('minor shift');
     expect(driftLabel(DRIFT_UP_THRESHOLD).label).toBe('minor shift');
@@ -108,8 +108,8 @@ describe('extractClaimDirection', () => {
     expect(extractClaimDirection(null)).toBe('unknown');
     expect(extractClaimDirection('[PARSE FAILED]')).toBe('unknown');
     expect(extractClaimDirection('[FAP — Gamma R2 aborted]')).toBe('unknown');
-    // Lowercase parse-failure sentinel from safeParseTrace also lands on unknown
-    // (via fallthrough — no directional tokens), never on a polarity verdict.
+    // Legacy lowercase sentinel (emitted by safeParseTrace before v1.3, present in
+    // committed traces) also lands on unknown via fallthrough — no directional tokens.
     expect(extractClaimDirection('[parse failed]')).toBe('unknown');
     expect(extractClaimDirection('The tradeoffs here are genuinely contested.')).toBe('unknown');
   });
@@ -178,28 +178,44 @@ describe('computeTFIDFCosine', () => {
     expect(computeTFIDFCosine([t('single claim')])).toBeNull();
   });
 
-  it('zeroes terms shared by ALL agents — identical claims score 0, not 1', () => {
-    // Documented IDF property: universally shared terms carry no discriminating
-    // signal (idf = log(N/N) = 0), so two identical docs have all-zero vectors.
-    expect(computeTFIDFCosine([t('sever the network now'), t('sever the network now')])).toBe(0);
+  it('identical claims score 1 — smoothed IDF makes the metric a convergence alarm', () => {
+    // v1.3 fix: idf = log(N/df) + 1, so universally shared terms keep weight 1.
+    // Two identical docs → identical vectors → cosine 1 (was 0 under v1.2).
+    expect(computeTFIDFCosine([t('sever the network now'), t('sever the network now')])).toBeCloseTo(1, 12);
   });
 
-  it('with N=2, any pair scores 0 (shared terms are always shared by all)', () => {
-    expect(computeTFIDFCosine([t('sever network connection'), t('sever network protection')])).toBe(0);
+  it('matches a hand-computed N=2 case (nonzero under smoothing, unlike v1.2)', () => {
+    // Tokens: [sever, network, connection] vs [sever, network, protection].
+    // Shared terms (df=2): idf = ln(1)+1 = 1. Unique terms (df=1): idf = ln(2)+1.
+    // cos = 2 / (2 + (ln2+1)²), uniform tf cancels.
+    const conv = computeTFIDFCosine([t('sever network connection'), t('sever network protection')]);
+    const u = Math.log(2) + 1;
+    expect(conv).toBeCloseTo(2 / (2 + u ** 2), 12);
   });
 
   it('matches a hand-computed 3-doc case where a term is shared by exactly two docs', () => {
-    // d1/d2 share "shared" (df=2 → idf=log(3/2) > 0); "common" is in all (idf 0).
+    // a = idf of a unique term, s = idf of "shared" (df=2), c = idf of "common" (df=3).
     const conv = computeTFIDFCosine([
       t('alpha shared common'),
       t('beta shared common'),
       t('gamma other common'),
     ]);
-    const l15 = Math.log(3 / 2);
-    const l3 = Math.log(3);
-    // cos(d1,d2) = log(1.5)² / (log3² + log1.5²); other two pairs are 0
-    const expected = (l15 ** 2 / (l3 ** 2 + l15 ** 2)) / 3;
-    expect(conv).toBeCloseTo(expected, 12);
+    const a = Math.log(3) + 1;
+    const s = Math.log(3 / 2) + 1;
+    const c = 1; // log(3/3) + 1
+    const m12 = a ** 2 + s ** 2 + c ** 2; // |d1|² = |d2|²
+    const m3 = 2 * a ** 2 + c ** 2;       // |d3|²
+    const cos12 = (s ** 2 + c ** 2) / m12;
+    const cos13 = c ** 2 / Math.sqrt(m12 * m3); // = cos23
+    expect(conv).toBeCloseTo((cos12 + 2 * cos13) / 3, 12);
+  });
+
+  it('reproduces the legacy v1.2 formula under { smoothIdf: false }', () => {
+    // The unsmoothed idf zeroes universally-shared terms: identical claims and any
+    // 2-doc pair score 0. Kept so arm-trace-v1.2 published numbers stay reproducible.
+    const legacy = { smoothIdf: false };
+    expect(computeTFIDFCosine([t('sever the network now'), t('sever the network now')], legacy)).toBe(0);
+    expect(computeTFIDFCosine([t('sever network connection'), t('sever network protection')], legacy)).toBe(0);
   });
 
   it('filters failed traces', () => {

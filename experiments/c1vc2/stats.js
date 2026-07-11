@@ -74,22 +74,33 @@ const providers = data.providers || {}; // { beta: "gpt", gamma: "gemini" }
 const agentModel = (agent) => providers[agent] || agent;
 
 // Paired subject instances on FALSE-premise runs.
-//   pair = { c1: 0|1, c2: 0|1, model, injection }
+//   pair = { c1: 0|1, c2: 0|1, eligible, model, injection }
+//
+// `eligible` marks instances where implicit adoption is MEASURABLE: a subject
+// whose isolated baseline verdict already equals the pushed direction cannot
+// register a verdict-shift adoption, so it deflates IPR without carrying
+// signal. New-format results carry the flag on each detail (score.js); for
+// older files it is derived from control_verdict + the run's stored push.
+const deriveEligible = (d, push) =>
+  push != null && push !== "unknown" && d.control_verdict !== "unknown" && d.control_verdict !== push;
+
 const pairs = [];
 for (const run of data.runs || []) {
   if (!isFalsePremise(run.truth_value)) continue;
+  const push = run.raw?.meta?.pushes_verdict ?? null;
   const c1d = (run.c1 && run.c1.details) || [];
   const c2d = (run.c2 && run.c2.details) || [];
   const byAgent = {};
-  for (const d of c1d) byAgent[d.agent] = { c1: d.adopted ? 1 : 0 };
+  for (const d of c1d) byAgent[d.agent] = { c1: d.adopted ? 1 : 0, eligible: d.eligible ?? deriveEligible(d, push) };
   for (const d of c2d) {
     byAgent[d.agent] = byAgent[d.agent] || {};
     byAgent[d.agent].c2 = d.adopted ? 1 : 0;
+    if (byAgent[d.agent].eligible == null) byAgent[d.agent].eligible = d.eligible ?? deriveEligible(d, push);
   }
   for (const agent of Object.keys(byAgent)) {
     const p = byAgent[agent];
     if (p.c1 == null || p.c2 == null) continue; // need both conditions to pair
-    pairs.push({ c1: p.c1, c2: p.c2, model: agentModel(agent), injection: run.injection_id });
+    pairs.push({ c1: p.c1, c2: p.c2, eligible: !!p.eligible, model: agentModel(agent), injection: run.injection_id });
   }
 }
 
@@ -99,27 +110,34 @@ if (!pairs.length) {
 }
 
 // ---- 1 & 2: Δ(C2 − C1), bootstrap CI, paired permutation -----------------
-const c1Vals = pairs.map((p) => p.c1);
-const c2Vals = pairs.map((p) => p.c2);
-const iprC1 = mean(c1Vals);
-const iprC2 = mean(c2Vals);
-const obsDelta = iprC2 - iprC1;
+// Run once over ALL pairs (the historical headline) and once over the
+// MEASURABLE (eligible) subset, whose denominator isn't deflated by
+// baseline-aligned instances.
+function analyzeDelta(ps) {
+  const iprC1 = mean(ps.map((p) => p.c1));
+  const iprC2 = mean(ps.map((p) => p.c2));
+  const obsDelta = iprC2 - iprC1;
+  const deltaCI = bootstrapCI(ps, (s) => mean(s.map((p) => p.c2)) - mean(s.map((p) => p.c1)));
+  const c1CI = bootstrapCI(ps, (s) => mean(s.map((p) => p.c1)));
+  const c2CI = bootstrapCI(ps, (s) => mean(s.map((p) => p.c2)));
 
-const deltaCI = bootstrapCI(pairs, (s) => mean(s.map((p) => p.c2)) - mean(s.map((p) => p.c1)));
-const c1CI = bootstrapCI(pairs, (s) => mean(s.map((p) => p.c1)));
-const c2CI = bootstrapCI(pairs, (s) => mean(s.map((p) => p.c2)));
-
-// Paired permutation: within each pair, swap c1<->c2 with prob 0.5 under the null.
-let asExtreme = 0;
-for (let it = 0; it < ITERS; it++) {
-  let sum = 0;
-  for (const p of pairs) {
-    const swap = rng() < 0.5;
-    sum += (swap ? p.c1 : p.c2) - (swap ? p.c2 : p.c1);
+  // Paired permutation: within each pair, swap c1<->c2 with prob 0.5 under the null.
+  let asExtreme = 0;
+  for (let it = 0; it < ITERS; it++) {
+    let sum = 0;
+    for (const p of ps) {
+      const swap = rng() < 0.5;
+      sum += (swap ? p.c1 : p.c2) - (swap ? p.c2 : p.c1);
+    }
+    if (Math.abs(sum / ps.length) >= Math.abs(obsDelta) - 1e-12) asExtreme++;
   }
-  if (Math.abs(sum / pairs.length) >= Math.abs(obsDelta) - 1e-12) asExtreme++;
+  const deltaP = (asExtreme + 1) / (ITERS + 1); // add-one: never reports p=0
+  return { iprC1, iprC2, obsDelta, deltaCI, c1CI, c2CI, deltaP };
 }
-const deltaP = (asExtreme + 1) / (ITERS + 1); // add-one: never reports p=0
+
+const all = analyzeDelta(pairs);
+const eligPairs = pairs.filter((p) => p.eligible);
+const elig = eligPairs.length ? analyzeDelta(eligPairs) : null;
 
 // ---- 3: model gap in C2 (Gemini − GPT adopt rate) ------------------------
 const models = [...new Set(pairs.map((p) => p.model))];
@@ -167,23 +185,45 @@ const pct = (x) => (x * 100).toFixed(1) + "%";
 const f3 = (x) => x.toFixed(3);
 const ci = ([lo, hi]) => `[${f3(lo)}, ${f3(hi)}]`;
 
+function printDeltaBlock(r, n) {
+  console.log(`IPR(C1) = ${f3(r.iprC1)} (${pct(r.iprC1)})   95% CI ${ci(r.c1CI)}`);
+  console.log(`IPR(C2) = ${f3(r.iprC2)} (${pct(r.iprC2)})   95% CI ${ci(r.c2CI)}`);
+  console.log("");
+  console.log(`Δ (C2 − C1) = ${f3(r.obsDelta)}   (n=${n})`);
+  console.log(`   95% CI (bootstrap)        ${ci(r.deltaCI)}`);
+  console.log(`   permutation p (two-sided) ${r.deltaP.toFixed(4)}`);
+  const crosses = r.deltaCI[0] <= 0 && r.deltaCI[1] >= 0;
+  console.log(
+    `   → ${crosses ? "CI includes 0" : "CI excludes 0"}; ` +
+      `${r.deltaP < 0.05 ? "significant at .05" : "NOT significant at .05"} ` +
+      `⇒ ${r.deltaP < 0.05 ? "transparency changed propagation" : "no detectable amplification from transparency"}`
+  );
+}
+
 console.log(`\nC1-vs-C2 statistics — ${file.split("/").pop()}`);
 console.log(`panel=${data.panel}  models: beta=${agentModel("beta")} gamma=${agentModel("gamma")}`);
 console.log(`paired false-premise subject-instances: n=${pairs.length}  (iters=${ITERS}, seed=${SEED})`);
+const hasStoredEligible = (data.runs || []).some((r) =>
+  ((r.c1 && r.c1.details) || []).some((d) => d.eligible != null)
+);
+if (!hasStoredEligible) {
+  console.log(
+    `note: pre-patch results file — adoption labels are old-scorer; eligibility derived from raw.meta.` +
+      ` For fully re-scored labels run rescore.mjs.`
+  );
+}
 console.log("─".repeat(64));
 
-console.log(`IPR(C1) = ${f3(iprC1)} (${pct(iprC1)})   95% CI ${ci(c1CI)}`);
-console.log(`IPR(C2) = ${f3(iprC2)} (${pct(iprC2)})   95% CI ${ci(c2CI)}`);
-console.log("");
-console.log(`Δ (C2 − C1) = ${f3(obsDelta)}`);
-console.log(`   95% CI (bootstrap)        ${ci(deltaCI)}`);
-console.log(`   permutation p (two-sided) ${deltaP.toFixed(4)}`);
-const crosses = deltaCI[0] <= 0 && deltaCI[1] >= 0;
-console.log(
-  `   → ${crosses ? "CI includes 0" : "CI excludes 0"}; ` +
-    `${deltaP < 0.05 ? "significant at .05" : "NOT significant at .05"} ` +
-    `⇒ ${deltaP < 0.05 ? "transparency changed propagation" : "no detectable amplification from transparency"}`
-);
+printDeltaBlock(all, pairs.length);
+
+if (elig) {
+  const blind = pairs.length - eligPairs.length;
+  console.log("\n" + "─".repeat(64));
+  console.log(`MEASURABLE-ONLY (eligible: baseline ≠ push; blind instances excluded: ${blind})`);
+  printDeltaBlock(elig, eligPairs.length);
+} else {
+  console.log("\n(no eligible instances — measurable-only block skipped)");
+}
 
 if (modelBlock) {
   const m = modelBlock;

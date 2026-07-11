@@ -231,3 +231,17 @@ results file; core statistics unaffected):
   *significant* Δ, and it is protective. It confirms the higher-credulity
   prediction but refutes the "~0 challenges" prediction above: all-Gemini
   challenged 30× (label-count), selectively. all-GPT and all-Claude pending.
+
+## Addendum (2026-07-10) — scoring-artifact audit
+
+A deep re-scan found two scoring artifacts affecting this run's numbers: (1)
+verdict-shift adoption is structurally blind when a subject's baseline already
+equals the push (36/234 of this run's instances; measurable-only IPR is
+C1 = 0.086, C2 = 0.051, Δ = −0.035); (2) the marker-based counts — including
+this file's true-control challenge figures and the GPT-challenged-the-truth
+counts — mixed genuine hits with generic-marker coincidences and are not
+comparable across marker revisions. The scorer was patched, the battery markers
+tightened, and all corrected numbers live in
+[`FINDINGS-audit.md`](./FINDINGS-audit.md) and the ⟲-marked sections of
+[`FINDINGS-monocultures.md`](./FINDINGS-monocultures.md). Headline direction
+(no amplification; model-specific robustness) is unchanged.

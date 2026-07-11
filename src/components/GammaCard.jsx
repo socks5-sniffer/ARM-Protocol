@@ -23,7 +23,11 @@ export function GammaCard({ trace }) {
           <Tag color={disColor} bg={disColor + "20"}>disagreement: {disClass}</Tag>
         )}
         {trace.reconciliation_status && (
-          <Tag color={trace.reconciliation_status === "gamma_flip_detected" ? C.warn : C.success}>{trace.reconciliation_status}</Tag>
+          <Tag color={
+            trace.reconciliation_status === "gamma_flip_detected" ? C.warn
+            : trace.reconciliation_status === "failed" ? C.error
+            : C.success
+          }>{trace.reconciliation_status}</Tag>
         )}
         {trace.polarity_audit?.requires_manual_review === true && (
           <Tag color={C.warn} bg={C.warn + "20"}>MANUAL REVIEW REQUIRED</Tag>
@@ -39,6 +43,15 @@ export function GammaCard({ trace }) {
         <div style={{ marginBottom: "0.45rem" }}>
           {providerTag && <Tag color={C.accent}>{providerTag}</Tag>}
           {modelTag && <Tag color={C.muted}>{modelTag}</Tag>}
+        </div>
+      )}
+
+      {failed && (
+        <div style={{ background: "#1e0a0a", border: `1px solid ${C.error}40`, borderRadius: "4px", padding: "0.6rem", fontSize: "0.68rem", color: C.error }}>
+          {trace.failure_reason || "reconciliation failed"}
+          {trace.raw_reasoning_attempt && (
+            <div style={{ color: C.muted, marginTop: "0.4rem", fontSize: "0.62rem" }}>{trace.raw_reasoning_attempt.slice(0, 300)}...</div>
+          )}
         </div>
       )}
 

@@ -39,6 +39,46 @@ trace-schema changes.
 ### Removed
 - `fap_requeue` block from run output — isolation re-dispatch no longer occurs.
 
+### Fixed
+- **C1-vs-C2 scorer audit** (`src/lib/score.js`). Two artifacts found in the
+  experiment's own scorer, not the protocol: (1) implicit adoption is
+  structurally unmeasurable when a subject's baseline already equals the push
+  direction — those instances were counted as non-adoptions, deflating IPR (33%
+  of all-Gemini's instances affected; corrected measurable IPR 21.0%/10.5% vs.
+  the previously reported 14.2%/7.1%); (2) marker-matching scored a subject as
+  "adopting" a fallacy when it named the fallacy's marker phrase in the act of
+  *refuting* it. Together these produced the program's only positive Δ
+  (all-Claude, +0.017, built from 4 refutations) and GPT's reported 6/30
+  true-premise "adoptions" (0 genuine). Both now correctly read 0. **H1 fails in
+  every panel with zero exceptions post-fix.** `classifyAgent` now exposes an
+  `eligible` flag; `computeIPR`/`summarizeCondition` report `ipr_eligible`
+  alongside the raw rate. `stats.js` reports the measurable-only block. Battery
+  markers (`injections-logical.json`) tightened to distinctive verbatim phrases.
+  Full trail: `experiments/c1vc2/FINDINGS-audit.md`, `experiments/c1vc2/rescore.mjs`.
+- **GPT truncation detection.** OpenAI's `finish_reason: "length"` is now mapped
+  to the provider-neutral `"max_tokens"` value `safeParseTrace` checks (Gemini's
+  equivalent was already mapped; Claude reports it natively). A truncated GPT
+  response no longer misreports as a generic JSON parse error.
+- **TF-IDF convergence smoothing.** `computeTFIDFCosine` used an unsmoothed IDF
+  that zeroed terms shared by every agent, so identical R1 claims scored 0.0
+  similarity instead of 1.0. Fixed to `log(N/df) + 1`; the pre-fix formula is
+  preserved behind `{ smoothIdf: false }` so `arm-trace-v1.2` exports still
+  reproduce exactly. **Schema bumped to `arm-trace-v1.3`.**
+- **`GammaCard` rendered a failed reconciliation as success-green** with no
+  failure detail. Now shows the same red failure panel `AgentCard` uses.
+- **FAP-aborted runs (silent-baseline parse failure) were never auto-saved.**
+  Now auto-save with a `-fap` filename suffix.
+- **Polarity-gate audit now keys off the harness-computed delta**, not the
+  model's self-report, for `confidence_delta_blindspot`. Self-report is kept
+  alongside for comparison but no longer drives the flag.
+- Removed the `VITE_ARM_ACCESS_TOKEN` build-time fallback in `src/api.js` —
+  `VITE_`-prefixed vars are inlined into the static bundle, making this a latent
+  token-leak risk. The proxy token now comes only from the UI field / `localStorage`.
+- Minor: parse-failure sentinel unified to `"[PARSE FAILED]"`; non-JSON proxy
+  error bodies no longer misreport as retryable network errors; `capLen` hard
+  bound when the cap is smaller than its truncation marker; export blob URL
+  revocation delayed to avoid a theoretical download race.
+
 ## [0.9.0] — 2026-06-23
 
 First public release.

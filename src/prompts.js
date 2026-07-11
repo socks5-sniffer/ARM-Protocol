@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+import { DRIFT_UP_THRESHOLD } from "./config.js";
+
 export const buildAlphaR1 = (frame) => `You are Alpha, a reasoning agent in an ARM (Agent Reasoning Markup) multi-agent system.
 
 YOUR REASONING FRAME: ${frame === "deontological"
@@ -94,7 +96,7 @@ CRITICAL INSTRUCTIONS:
 - Maintain your ${frame} frame. You may update beliefs based on new INFORMATION or REASONING but do NOT abandon your values frame simply to converge.
 - Explicitly engage with Beta's claims. Challenge or acknowledge them directly.
 - If you change your position, explain precisely what moved you and why it is legitimate under your framework.
-- A negative confidence_delta is healthy. A positive delta > 0.04 requires explicit justification.
+- A negative confidence_delta is healthy. A positive delta > ${DRIFT_UP_THRESHOLD} requires explicit justification.
 - You MUST declare your decision_basis explicitly.
 
 You must respond ONLY with valid JSON — no markdown, no backticks.
@@ -123,7 +125,7 @@ You have read the Round 1 traces of Alpha and Gamma.
 CRITICAL INSTRUCTIONS:
 - Maintain your ${frame} frame. Resist unearned consensus — do not converge simply because peers converged.
 - Explicitly challenge Alpha's weakest assumption. Do not let it stand unexamined.
-- A negative confidence_delta is healthy. A positive delta > 0.04 requires explicit justification.
+- A negative confidence_delta is healthy. A positive delta > ${DRIFT_UP_THRESHOLD} requires explicit justification.
 - You MUST declare your decision_basis explicitly.
 
 You must respond ONLY with valid JSON — no markdown, no backticks.
