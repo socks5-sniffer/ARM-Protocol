@@ -150,7 +150,7 @@ The ARM interface is a dark-theme React app with monospace typography designed f
 - **Controls bar** — role injection toggle, Alpha/Beta frame selectors, rotating silent baseline selector
 - **Real-time log** — timestamped sequential dispatch events
 - **Round 1 grid** — 3-column AgentCard layout (Alpha, Beta, Gamma) + separate γ-Silent row
-- **R1 convergence meter** — Jaccard lexical similarity; warns at > 0.4
+- **R1 convergence meter** — Jaccard lexical similarity, TF-IDF cosine (smoothed IDF as of `arm-trace-v1.3` — identical claims correctly score 1.0, not 0.0), and embedding cosine; all warn at > 0.4 (Jaccard/TF-IDF) or > 0.85 (embedding)
 - **Round 2 grid** — 2-column Alpha/Beta + full-width GammaCard
 - **Confidence-Δ panel** — descriptive per-agent confidence deltas + Gamma self-delta (labeled *unvalidated*; not a detector)
 - **Export JSON** — downloads full run telemetry as `arm-v0.9-run-{timestamp}.json`, sealed with a SHA-256 `export_integrity_hash`
@@ -373,7 +373,7 @@ Gamma R2 adds:
   // Written by the harness when it fires:
   "polarity_audit": { /* firm yes↔no reversal — the gate; requires_manual_review: true */ },
   "verdict_shift": { /* hedge to/from "conditional" — advisory only; requires_manual_review: false */ },
-  // schema_version: "arm-trace-v1.2" (written to runMeta.schema_version)
+  // schema_version: "arm-trace-v1.3" (written to runMeta.schema_version)
 }
 ```
 
@@ -407,6 +407,70 @@ confidence-delta machinery is therefore demoted from *detector* to *description*
   "downward shift") — the "memetic drift" / "epistemic tightening" verdicts are gone.
 - **`confidence` is documented as self-reported and unvalidated**; the behavioral
   IPR metric in `experiments/c1vc2` is the falsifiable signal that replaces it.
+
+### Unreleased — C1-vs-C2 scorer audit & implementation hardening
+
+A deep re-scan of the raw C1-vs-C2 per-instance data found two artifacts in the
+experiment's own scorer (`src/lib/score.js`) — not the protocol under test, the
+instrument measuring it. Full trail: [`experiments/c1vc2/FINDINGS-audit.md`](experiments/c1vc2/FINDINGS-audit.md),
+reproducible via `node experiments/c1vc2/rescore.mjs`.
+
+- **Eligible-mask fix.** Implicit adoption (a subject's verdict shifting to the
+  pushed direction vs. its own baseline) is structurally unmeasurable when the
+  baseline already equals the push — those instances were still counted as
+  non-adoptions, deflating the denominator. 33% of all-Gemini's false-premise
+  instances were affected. Corrected: all-Gemini's true measurable IPR is
+  **21.0%** (C1) / **10.5%** (C2), not the previously reported 14.2% / 7.1%; the
+  protective Δ strengthens to **−0.105** (p≈.01).
+- **Verdict-guarded `explicit_adoption`.** Marker-matching previously scored a
+  subject as "adopting" a fallacy whenever its reasoning named the fallacy's own
+  marker phrase, even while explicitly rejecting it in different words. This was
+  the entire basis of the program's only positive Δ (all-Claude, +0.017, built
+  from 4 such refutations-mislabeled-as-adoptions) and of GPT's reported 6/30
+  "adoptions" of the true-premise control. Both collapse to their honest values
+  (Δ = 0.000; 0/30) once the scorer requires the verdict to actually land on the
+  pushed side. **H1 (Persuasion Duality) now fails in every panel with zero
+  exceptions.**
+- **Battery markers tightened** (`injections-logical.json`) — replaced generic
+  terms and fallacy-name phrases with distinctive verbatim trace phrases so the
+  scorer fix above has clean markers to work with. Injected payloads unchanged.
+- **`stats.js`** now reports a measurable-only IPR/Δ/CI/permutation block
+  alongside the raw one.
+
+Separately, a full pass over `src/` fixed several implementation issues surfaced
+during review:
+
+- **GPT truncation was silently misdiagnosed.** OpenAI reports `finish_reason:
+  "length"` on truncation; only Gemini's equivalent was mapped to the
+  provider-neutral `"max_tokens"` value `safeParseTrace` checks. A truncated GPT
+  response was logged as a generic JSON parse error instead of "raise the token
+  budget." Claude's native `stop_reason` already matched; only GPT needed the fix.
+- **TF-IDF convergence smoothed.** The unsmoothed IDF zeroed terms shared by every
+  agent, so two *identical* R1 claims scored 0.0 similarity — maximal convergence
+  displayed as "healthy independence." Now `log(N/df) + 1`; identical claims score
+  1.0 and the >0.4 alert threshold is reachable. The old formula is preserved
+  behind `{ smoothIdf: false }` so `arm-trace-v1.2` exports still reproduce
+  exactly. Schema bumped to **`arm-trace-v1.3`**.
+- **A failed Gamma reconciliation rendered as success-green** in the UI
+  (`GammaCard`), with no failure detail shown. Now renders the same red failure
+  panel `AgentCard` already had.
+- **FAP-aborted runs (silent-baseline parse failure) were never auto-saved** —
+  only a full completion triggered the save. Partial runs now auto-save with a
+  `-fap` filename suffix.
+- **The polarity-gate audit block now keys off the harness-computed delta**,
+  not the model's self-reported one, for `confidence_delta_blindspot`. A model
+  that misreports its own delta could previously shape its own audit record; the
+  self-report is retained alongside for comparison, but no longer drives the flag.
+- **Removed the `VITE_ARM_ACCESS_TOKEN` build-time fallback.** Any `VITE_`-prefixed
+  variable is inlined into the static bundle at build time; a fallback for the
+  proxy access token was a latent leak-to-every-visitor risk if ever set in a
+  production build. The token now comes only from the UI field / `localStorage`.
+- Minor: parse-failure sentinel unified to `"[PARSE FAILED]"` (was lowercase,
+  inconsistent with the guards in `analysis.js`/`score.js`); non-JSON proxy error
+  bodies (e.g. an HTML 502 page) no longer get misreported as retryable network
+  errors; `capLen` hard-truncates instead of exceeding its bound when the cap is
+  smaller than the truncation marker; export blob URL revocation delayed to avoid
+  a theoretical download race.
 
 ### v0.9 — Reconciler Coverage & Matched-Panel Validation
 
