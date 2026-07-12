@@ -66,6 +66,21 @@ trace-schema changes.
 
 ### Removed
 - `fap_requeue` block from run output — isolation re-dispatch no longer occurs.
+- **Rotating silent-baseline selector (resolves B1 by removal).** The v0.7.1
+  `silentAgent` selector existed to test whether baseline-confidence
+  reproducibility was a protocol property — a question retired now that
+  confidence is descriptive-only. Its wiring was never forked from production:
+  with `silentAgent: alpha|beta` the harness handed Gamma *another agent's
+  framed trace* labeled "YOUR OWN prior" (the known B1 cross-wiring), which
+  also corrupted the polarity gate's baseline (9 of the 19 historical gate
+  firings were rotated-mode cross-agent comparisons). The silent baseline is
+  now **always a second Gamma draw** — required, since the consensus polarity
+  gate uses it as co-witness. Exported traces keep `silentAgent: "gamma"` for
+  schema stability; `classifyGammaPolarity()` retains the `visible_r1_only`
+  fallback so legacy rotated-mode traces remain analyzable. The second Gamma
+  call is a deliberate cost paid for the baseline-(in)stability metric; if
+  accumulated data shows instability is rare/uninformative, that call is the
+  designated future cost cut (noted in-code).
 
 ### Fixed
 - **C1-vs-C2 scorer audit** (`src/lib/score.js`). Two artifacts found in the

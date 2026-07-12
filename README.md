@@ -33,9 +33,9 @@ Agents are dispatched **sequentially** to prevent API rate-limit collisions. Eac
 | **Alpha** | Reasoning agent | Configurable: `deontological`, `consequentialist`, or `independent` |
 | **Beta** | Epistemic regulator | Configurable: same options; default `consequentialist` to oppose Alpha's default |
 | **Gamma** | Independent prior | Unframed — reasons from first principles |
-| **γ-Silent** | Calibration anchor | Completely isolated; never sees peers; anchors all drift math |
+| **γ-Silent** | Consensus co-witness + calibration anchor | Always a second **Gamma** draw; completely isolated; never seen by peers |
 
-The γ-Silent baseline is **not shared** with any peer agent. It exists solely as Gamma's personal anchor for Round 2 self-delta computation.
+The γ-Silent baseline is **not shared** with any peer agent — "silent" means silent *to the peers*; it is fed back to Gamma itself in Round 2 as its own prior. It does two jobs: it is the polarity gate's **consensus co-witness** (the gate only trusts a "flip" when Gamma's two independent R1 draws agreed on the prior — when they disagree, the run is flagged `baseline_unstable` instead), and it anchors Gamma's Round-2 self-delta (descriptive).
 
 ### Round 2 — Deliberation (Adversarial Pressure Active)
 
@@ -147,7 +147,7 @@ oc get route arm-protocol
 The ARM interface is a dark-theme React app with monospace typography designed for trace inspection:
 
 - **Question textarea** — editable at runtime, disabled during a run
-- **Controls bar** — role injection toggle, Alpha/Beta frame selectors, rotating silent baseline selector
+- **Controls bar** — role injection toggle, Alpha/Beta frame selectors, per-agent provider selectors
 - **Real-time log** — timestamped sequential dispatch events
 - **Round 1 grid** — 3-column AgentCard layout (Alpha, Beta, Gamma) + separate γ-Silent row
 - **R1 convergence meter** — Jaccard lexical similarity, TF-IDF cosine (smoothed IDF as of `arm-trace-v1.3` — identical claims correctly score 1.0, not 0.0), and embedding cosine; all warn at > 0.4 (Jaccard/TF-IDF) or > 0.85 (embedding)
@@ -386,8 +386,9 @@ R1 draws (the visible R1 and the silent baseline R2 is actually anchored to), an
 the gate is evaluated only when those two agree — a flip then contradicts both.
 When the two draws **disagree**, the model's own prior is a coin flip on that
 question, so the gate is skipped and a **`baseline_unstable`** advisory is written
-instead (informational; no override). With a rotated silent baseline
-(`silentAgent ≠ gamma`) the gate falls back to the legacy visible-R1-only
+instead (informational; no override). When consensus is undefined (an
+unparseable baseline verdict, or legacy traces from the removed
+rotating-baseline mode) the gate falls back to the visible-R1-only
 comparison and records `baseline_mode: "visible_r1_only"`. The **verdict-shift
 advisory** (`verdict_shift`) fires when the reconciler hedges to or firms away
 from `conditional`; it too is informational and does **not** override
@@ -560,6 +561,13 @@ Tightening (downward drift) is healthy; only upward drift is the threat. The thr
 > **Superseded (post-v0.9):** the interpretive labels above ("epistemic tightening", "memetic drift") claimed an epistemic meaning the signal doesn't carry — the `experiments/c1vc2` detector run put confidence-drift discrimination at AUC ≈ 0.44. The thresholds now only bound **descriptive** direction/magnitude labels ("downward shift" / "minor shift" / "upward shift") and drive no action.
 
 #### 2. Rotating Silent Baseline
+
+> **Superseded (post-v0.9):** the rotating selector has been **removed**. It was
+> built to test whether baseline-confidence reproducibility was a protocol
+> property — a question retired when confidence became descriptive-only — and its
+> wiring handed Gamma another agent's framed trace as "YOUR OWN prior" (B1). The
+> silent baseline is now always a Gamma draw and serves as the consensus
+> co-witness for the polarity gate.
 Previously γ-Silent was always Gamma. v0.7.1 adds a UI selector:
 
 ```

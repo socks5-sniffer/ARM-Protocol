@@ -44,7 +44,6 @@ export default function ARM() {
   const [question, setQuestion]             = useState(DEFAULT_QUESTION);
   const [questionId, setQuestionId]         = useState("200");
   const [roleInjection, setRoleInjection]   = useState(true);
-  const [silentAgent, setSilentAgent]       = useState("gamma"); // rotating baseline
   const [alphaFrame, setAlphaFrame]         = useState("deontological");
   const [betaFrame, setBetaFrame]           = useState("consequentialist");
   const [alphaProvider, setAlphaProvider]   = useState("claude");
@@ -98,11 +97,11 @@ export default function ARM() {
       beta:  betaProvider,
       gamma: gammaProvider,
     };
-    const silentProvider = providers[silentAgent];
+    const silentProvider = providers.gamma;
     // Provider keys are validated server-side; a missing key surfaces as an API
     // error on the first call rather than a client-side pre-flight check.
 
-    addLog(`ARM v${ARM_VERSION} · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
+    addLog(`ARM v${ARM_VERSION} · role_injection:${roleInjection}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
     addLog(`Question: "${question.slice(0, 80)}..."`);
     addLog("R1 — sequential isolation (zero cross-visibility)");
@@ -134,19 +133,26 @@ export default function ARM() {
     setR1((prev) => ({ ...prev, gamma: pG1.trace }));
     addLog(`  → Gamma R1: ${pG1.ok ? "ok" : "FAIL"} · ${pG1.trace._meta?.provider || "?"}/${pG1.trace._meta?.model || "?"} · confidence: ${pG1.trace.confidence ?? "?"}`);
 
-    // ── R1: Silent Baseline (rotating) ────────────────────────────────────────
-    // TODO(B1): when silentAgent is alpha/beta, this framed silent trace is later
-    // presented to Gamma as "YOUR OWN prior", so harness_self_delta_vs_baseline
-    // becomes a cross-agent delta rather than a true self-delta. Known bug — out of
-    // scope for this PR (deterministic-drift). Do not rely on rotated self-delta.
-    addLog(`  → dispatching Silent Baseline [${silentAgent}] via ${PROVIDER_LABEL[silentProvider]} (no peer exposure)...`);
+    // ── R1: γ-Silent Baseline ─────────────────────────────────────────────────
+    // Always a GAMMA draw. This is Gamma's second independent R1 sample: never
+    // shown to Alpha/Beta, fed back to Gamma R2 as its own prior, and — post
+    // consensus-gate — the co-witness the polarity gate requires to agree with
+    // the visible R1 before a "flip" is trusted. (The v0.7.1 rotating-baseline
+    // selector was removed: it silently handed Gamma another agent's framed
+    // trace as "YOUR OWN prior" — the B1 cross-wiring — and the confidence-
+    // reproducibility question it probed is retired to descriptive-only.)
+    //
+    // Cost note: this is one extra API call per run, paid deliberately for the
+    // baseline-(in)stability metric. If accumulated run data later shows the
+    // instability signal is rare or uninformative, this second draw is the
+    // thing to delete to save cost/latency — see baseline_unstable in runMeta.
+    addLog(`  → dispatching γ-Silent Baseline via ${PROVIDER_LABEL[silentProvider]} (no peer exposure)...`);
     const silentQ = questionBlock(question);
-    const silentFrame = silentAgent === "alpha" ? frames.alpha : silentAgent === "beta" ? frames.beta : "independent";
-    const resSilent = await callProvider(silentProvider, buildSilentBaselinePrompt(silentAgent, silentFrame), silentQ, TOKENS_R1, addLog);
+    const resSilent = await callProvider(silentProvider, buildSilentBaselinePrompt(), silentQ, TOKENS_R1, addLog);
     const pSilent = safeParseTrace(resSilent, "silent");
     const silentBaselineFailed = !pSilent.ok || pSilent.trace.confidence == null;
     setR1((prev) => ({ ...prev, silent: pSilent.trace }));
-    addLog(`  → Silent Baseline (${silentAgent}): ${pSilent.ok ? "ok" : "FAIL"} · ${pSilent.trace._meta?.provider || "?"}/${pSilent.trace._meta?.model || "?"} · confidence: ${pSilent.trace.confidence ?? "?"}`);
+    addLog(`  → γ-Silent Baseline: ${pSilent.ok ? "ok" : "FAIL"} · ${pSilent.trace._meta?.provider || "?"}/${pSilent.trace._meta?.model || "?"} · confidence: ${pSilent.trace.confidence ?? "?"}`);
     if (silentBaselineFailed) addLog("⚠ Silent baseline parse failed — self_delta computation will be unavailable; Gamma R2 aborted.");
 
     // ── R1 convergence (three-layer) ─────────────────────────────────────────
@@ -302,7 +308,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         schema_version: EXPORT_SCHEMA_VERSION,
         duration: elapsed,
         roleInjection,
-        silentAgent,
+        silentAgent: "gamma",
         frames,
         providers,
         silentConfidence: null,
@@ -326,7 +332,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         questionId,
         providers,
         roleInjection,
-        silentAgent,
+        silentAgent: "gamma",
         status: "fap",
       });
       const fapSaved = await saveTrace(
@@ -377,7 +383,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
     // When they DISAGREE, the model's own prior is a coin flip on this question,
     // so instead of firing a false MANUAL REVIEW the harness raises a
     // baseline-instability advisory and skips the gate. With a rotated silent
-    // baseline (silentAgent ≠ gamma) or an unparseable verdict, it falls back to
+    // baseline (legacy rotated-baseline traces) or an unparseable verdict, it falls
     // the legacy visible-R1-only comparison and records that mode in the audit.
     if (pG2.ok) {
       const r1Dir = extractVerdict(pG1.trace);
@@ -387,7 +393,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         r1: r1Dir,
         silent: silentDir,
         r2: r2Dir,
-        silentIsGamma: silentAgent === "gamma",
+        silentIsGamma: true, // rotation removed — the silent draw is always Gamma's
       });
       if (baselineMode === "unstable") {
         // Gamma's own R1 is split (visible draw ≠ silent draw). A "flip" is not a
@@ -426,7 +432,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           // (rotated silent baseline or unparseable verdict — consensus undefined).
           baseline_mode:          baselineMode,
           baselines_agree:        baselinesAgree,
-          silent_agent:           silentAgent,
+          silent_agent:           "gamma",
           harness_self_delta:     harnessGammaDelta,
           self_reported_delta:    selfReportedGammaDelta,
           confidence_delta_blindspot: harnessGammaDelta !== null && Math.abs(harnessGammaDelta) <= DRIFT_UP_THRESHOLD,
@@ -471,7 +477,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       schema_version: EXPORT_SCHEMA_VERSION,
       duration: elapsed,
       roleInjection,
-      silentAgent,
+      silentAgent: "gamma",
       frames,
       providers,
       silentConfidence: pSilent.trace.confidence,
@@ -492,7 +498,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       questionId,
       providers,
       roleInjection,
-      silentAgent,
+      silentAgent: "gamma",
       status: "done",
     });
     const autoSavePayload = {
@@ -507,7 +513,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         schema_version: EXPORT_SCHEMA_VERSION,
         duration: elapsed,
         roleInjection,
-        silentAgent,
+        silentAgent: "gamma",
         frames,
         providers,
         silentConfidence: pSilent.trace.confidence,
@@ -652,17 +658,6 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           </select>
         </div>
 
-        {/* Silent baseline selector (rotating) */}
-        <div style={{ fontSize: "0.65rem", color: C.silent }}>
-          Silent baseline:
-          <select value={silentAgent} onChange={(e) => setSilentAgent(e.target.value)} disabled={isRunning}
-            style={{ background: C.surface, color: C.text, border: `1px solid ${C.silent}60`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
-            <option value="gamma">gamma (default)</option>
-            <option value="alpha">alpha (rotating test)</option>
-            <option value="beta">beta (rotating test)</option>
-          </select>
-        </div>
-
         {/* Proxy access token — gates the production /api proxy (server.js).
             Stored in localStorage, sent as x-arm-token; never baked into the bundle. */}
         <div style={{ fontSize: "0.65rem", color: C.muted }}>
@@ -717,9 +712,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           {r1.silent && (
             <div style={{ marginBottom: "1rem" }}>
               <div style={{ fontSize: "0.58rem", letterSpacing: "0.15em", color: C.silent, textTransform: "uppercase", marginBottom: "0.4rem" }}>
-                γ-silent · {silentAgent} baseline (no peer exposure · anchors Gamma self-Δ in R2)
+                γ-silent · gamma baseline (no peer exposure · consensus co-witness for the polarity gate · anchors Gamma self-Δ)
               </div>
-              <AgentCard agentId={silentAgent} trace={r1.silent} round={1} isSilent />
+              <AgentCard agentId="gamma" trace={r1.silent} round={1} isSilent />
             </div>
           )}
           {convergence !== null && (
@@ -775,7 +770,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
               <span style={{ color: C.muted, fontFamily: f.mono, fontSize: "0.68rem" }}>
                 {Number.isFinite(r2.gamma.harness_self_delta_vs_baseline) ? (r2.gamma.harness_self_delta_vs_baseline > 0 ? "+" : "") + Number(r2.gamma.harness_self_delta_vs_baseline).toFixed(3) : "—"}
               </span>
-              <span style={{ color: C.silent, fontSize: "0.68rem" }}>vs silent baseline ({silentAgent}){r2.gamma.self_delta_mismatch ? " · ⚠ mismatch" : ""}</span>
+              <span style={{ color: C.silent, fontSize: "0.68rem" }}>vs γ-silent baseline{r2.gamma.self_delta_mismatch ? " · ⚠ mismatch" : ""}</span>
             </div>
           )}
           {convergence !== null && (
@@ -808,7 +803,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
             v{ARM_VERSION}: confidence Δ is descriptive only (unvalidated — AUC ≈ 0.44 as a detector; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ &lt; 0 = downward shift · Δ = 0 = no shift · the polarity/verdict-flip gate is the detector<br/>
-            Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
+            Gamma Δ measured vs its γ-silent baseline · two independent Gamma R1 draws feed the consensus polarity gate<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>
         </div>

@@ -88,10 +88,11 @@ export function classifyVerdictTransition(v1, v2) {
 //                        prior is a coin flip on this question; flip detection is
 //                        unreliable, so the gate is not evaluated and the caller
 //                        should raise a baseline-instability advisory instead.
-//   "visible_r1_only"  — consensus can't be established (rotated silent baseline
-//                        belongs to another agent, or a verdict is unparseable).
-//                        Fall back to the legacy comparison against visible R1
-//                        alone, and say so in the audit record.
+//   "visible_r1_only"  — consensus can't be established (a verdict is
+//                        unparseable, or the silent draw isn't Gamma's — which
+//                        can only occur in legacy traces from the removed
+//                        rotating-baseline mode). Fall back to the comparison
+//                        against visible R1 alone, and say so in the audit.
 //
 // Returns { mode, baselinesAgree, transition } where `transition` is the
 // classifyVerdictTransition result the gate should act on ("not_evaluated"
@@ -104,7 +105,7 @@ export function classifyGammaPolarity({ r1, silent, r2, silentIsGamma }) {
     }
     return { mode: "unstable", baselinesAgree: false, transition: "not_evaluated" };
   }
-  // Rotated silent baseline (not a Gamma draw) or an unparseable verdict on
-  // either R1 draw: consensus is undefined, not merely absent.
+  // Non-Gamma silent draw (legacy rotated-baseline traces only) or an
+  // unparseable verdict on either R1 draw: consensus is undefined, not absent.
   return { mode: "visible_r1_only", baselinesAgree: null, transition: classifyVerdictTransition(r1, r2) };
 }
