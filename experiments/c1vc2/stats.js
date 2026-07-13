@@ -9,13 +9,24 @@
 //      via an INDEPENDENT two-group permutation test + bootstrap CI. These are
 //      different agents, so the null shuffles the model label across instances.
 //
-// Dependency-free on purpose (mirrors score.js). Seeded RNG → reproducible.
+// Seeded RNG → reproducible. By default the adoption labels are RE-SCORED from
+// the raw traces with the current src/lib/score.js (same policy as detector.js):
+// the `adopted` labels frozen into a results JSON at collection time predate the
+// 2026-07 scorer audit (eligible mask + verdict-guarded explicit_adoption), and
+// reading them reproduces the very false positives the audit removed. Pass
+// --stored-labels to use the frozen labels instead (reproducing older tables).
 //
 // Usage:
-//   node experiments/c1vc2/stats.js [results.json] [--iters N] [--seed S]
+//   node experiments/c1vc2/stats.js [results.json] [--iters N] [--seed S] [--stored-labels]
 //   node experiments/c1vc2/stats.js experiments/c1vc2/c1vc2-results-1782597403181.json
 
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { computeIPR } from "../../src/lib/score.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ---- args ----------------------------------------------------------------
 const args = process.argv.slice(2);
@@ -28,6 +39,7 @@ const file =
   "experiments/c1vc2/c1vc2-results-1782597403181.json";
 const ITERS = parseInt(getFlag("--iters", "10000"), 10);
 const SEED = parseInt(getFlag("--seed", "42"), 10);
+const STORED_LABELS = args.includes("--stored-labels");
 
 // ---- seeded RNG (mulberry32) so reported p-values/CIs are reproducible ----
 function makeRng(seed) {
@@ -68,6 +80,19 @@ function bootstrapCI(items, statFn, iters = ITERS) {
   return [percentile(dist, 0.025), percentile(dist, 0.975)];
 }
 
+// ---- battery index (for re-scoring from raw traces) ----------------------
+// Same construction as detector.js: index every injections*.json in this
+// directory by id, so any results file resolves its injection metadata
+// (premise_markers, pushes_verdict) for the current scorer.
+const injById = {};
+for (const bf of fs.readdirSync(__dirname).filter((f) => /^injections.*\.json$/.test(f))) {
+  try {
+    for (const inj of JSON.parse(fs.readFileSync(path.join(__dirname, bf), "utf8")).injections || []) {
+      if (inj.id) injById[inj.id] = inj;
+    }
+  } catch { /* skip an unparseable battery */ }
+}
+
 // ---- load + flatten ------------------------------------------------------
 const data = JSON.parse(fs.readFileSync(file, "utf8"));
 const providers = data.providers || {}; // { beta: "gpt", gamma: "gemini" }
@@ -79,17 +104,34 @@ const agentModel = (agent) => providers[agent] || agent;
 // `eligible` marks instances where implicit adoption is MEASURABLE: a subject
 // whose isolated baseline verdict already equals the pushed direction cannot
 // register a verdict-shift adoption, so it deflates IPR without carrying
-// signal. New-format results carry the flag on each detail (score.js); for
-// older files it is derived from control_verdict + the run's stored push.
+// signal. Re-scored details always carry the flag (score.js); on the
+// stored-label path older files derive it from control_verdict + the run's
+// stored push.
 const deriveEligible = (d, push) =>
   push != null && push !== "unknown" && d.control_verdict !== "unknown" && d.control_verdict !== push;
 
 const pairs = [];
+let rescoredRuns = 0;
+let storedRuns = 0; // runs that used frozen labels (--stored-labels, or missing raw/battery)
 for (const run of data.runs || []) {
   if (!isFalsePremise(run.truth_value)) continue;
   const push = run.raw?.meta?.pushes_verdict ?? null;
-  const c1d = (run.c1 && run.c1.details) || [];
-  const c2d = (run.c2 && run.c2.details) || [];
+  const inj = injById[run.injection_id];
+
+  // Default: re-score the raw traces with the current scorer (detector.js
+  // policy). Falls back to the frozen labels when raw traces or the battery
+  // entry are unavailable — counted and warned about below.
+  let c1d, c2d;
+  if (!STORED_LABELS && run.raw?.c1 && run.raw?.c2 && inj) {
+    c1d = computeIPR(run.raw.c1, run.raw.control, inj).details;
+    c2d = computeIPR(run.raw.c2, run.raw.control, inj).details;
+    rescoredRuns++;
+  } else {
+    c1d = (run.c1 && run.c1.details) || [];
+    c2d = (run.c2 && run.c2.details) || [];
+    storedRuns++;
+  }
+
   const byAgent = {};
   for (const d of c1d) byAgent[d.agent] = { c1: d.adopted ? 1 : 0, eligible: d.eligible ?? deriveEligible(d, push) };
   for (const d of c2d) {
@@ -203,14 +245,25 @@ function printDeltaBlock(r, n) {
 console.log(`\nC1-vs-C2 statistics — ${file.split("/").pop()}`);
 console.log(`panel=${data.panel}  models: beta=${agentModel("beta")} gamma=${agentModel("gamma")}`);
 console.log(`paired false-premise subject-instances: n=${pairs.length}  (iters=${ITERS}, seed=${SEED})`);
-const hasStoredEligible = (data.runs || []).some((r) =>
-  ((r.c1 && r.c1.details) || []).some((d) => d.eligible != null)
-);
-if (!hasStoredEligible) {
-  console.log(
-    `note: pre-patch results file — adoption labels are old-scorer; eligibility derived from raw.meta.` +
-      ` For fully re-scored labels run rescore.mjs.`
+if (STORED_LABELS) {
+  console.log(`scoring: STORED labels (--stored-labels) — frozen at collection time, may predate the 2026-07 scorer audit.`);
+  const hasStoredEligible = (data.runs || []).some((r) =>
+    ((r.c1 && r.c1.details) || []).some((d) => d.eligible != null)
   );
+  if (!hasStoredEligible) {
+    console.log(
+      `note: pre-patch results file — adoption labels are old-scorer; eligibility derived from raw.meta.` +
+        ` Drop --stored-labels (or run rescore.mjs) for current-scorer labels.`
+    );
+  }
+} else {
+  console.log(`scoring: re-scored from raw traces via src/lib/score.js (post-audit: eligible mask + verdict-guarded explicit_adoption).`);
+  if (storedRuns) {
+    console.log(
+      `⚠ ${storedRuns}/${rescoredRuns + storedRuns} false-premise runs fell back to STORED labels` +
+        ` (missing raw traces or no battery entry for their injection_id) — treat mixed-scorer results with care.`
+    );
+  }
 }
 console.log("─".repeat(64));
 

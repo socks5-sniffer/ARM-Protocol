@@ -10,6 +10,25 @@ trace-schema changes.
 ## [Unreleased]
 
 ### Changed
+- **c1vc2 tooling now headlines the audited (eligible-masked) numbers.** The
+  scorer audit added the `eligible` mask and re-scoring infrastructure, but the
+  pipeline's own reporting still led with raw, un-audited rates:
+  - `run.js` now headlines the **measurable IPR/Δ** — instance-pooled
+    (total adopted / total eligible) so it reconciles exactly with `rescore.mjs`
+    and `stats.js` — with the unmasked rate demoted to a secondary continuity
+    line, and decomposes adoption **by mechanism with split denominators**
+    (explicit over all scored instances; implicit over eligible instances, the
+    only ones where a verdict-shift is possible). The results-JSON `summary`
+    gains `c1/c2_ipr_eligible`, `delta_eligible_c2_minus_c1`, per-condition
+    eligible totals, and `c1/c2_mechanism` blocks (superseding `c1/c2_labels`).
+  - `stats.js` now **re-scores the raw traces with the current `score.js` by
+    default** (same policy as `detector.js`), instead of trusting `adopted`
+    labels frozen into results JSONs at collection time — those predate the
+    2026-07 scorer audit. `--stored-labels` preserves the legacy path for
+    reproducing older tables; a warning is printed if any run silently falls
+    back (missing raw traces or battery entry). Verified: re-scored output
+    matches `rescore.mjs` exactly on every deterministic number across all four
+    committed panels.
 - **Polarity gate now resolves its baseline against a Gamma R1 *consensus*.** The
   gate previously compared Gamma R2 against the visible R1 draw (`pG1`) alone —
   but R2 is prompted with the *silent* baseline as its prior, and the two draws
