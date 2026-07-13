@@ -18,8 +18,11 @@ function devProxyAuth(token) {
       if (!token) return;
       server.middlewares.use((req, res, next) => {
         if (!req.url || !req.url.startsWith("/api/")) return next();
-        const header = req.headers["x-arm-token"];
-        const bearer = /^Bearer\s+(.+)$/i.exec(req.headers["authorization"] || "");
+        // Node can surface repeated headers as string[]; normalize to the first
+        // value so an array never reaches the string comparison / Bearer regex.
+        const first = (v) => (Array.isArray(v) ? v[0] : v);
+        const header = first(req.headers["x-arm-token"]);
+        const bearer = /^Bearer\s+(.+)$/i.exec(first(req.headers["authorization"]) || "");
         const provided = (typeof header === "string" && header) || (bearer && bearer[1].trim()) || "";
         if (provided !== token) {
           res.statusCode = 401;
@@ -48,12 +51,13 @@ export default defineConfig(({ mode }) => {
   // comma-separated list, or the literal "all" to opt back into the old wide-open
   // behavior. Pair "all" with ARM_DEV_PROXY_TOKEN so the proxy is still gated.
   const allowedHostsEnv = (env.VITE_ALLOWED_HOSTS || "").trim();
+  const allowedHostsList = allowedHostsEnv.split(",").map((h) => h.trim()).filter(Boolean);
   const allowedHosts =
-    allowedHostsEnv === "all"
+    allowedHostsEnv.toLowerCase() === "all"
       ? "all"
-      : allowedHostsEnv
-        ? allowedHostsEnv.split(",").map((h) => h.trim()).filter(Boolean)
-        : undefined; // Vite default
+      : allowedHostsList.length
+        ? allowedHostsList
+        : undefined; // unset, or a degenerate value like "," → Vite default
 
   return {
     plugins: [react(), devProxyAuth(devProxyToken)],

@@ -263,9 +263,11 @@ app.use(enforceRateLimit);
 app.use("/api", requireProxyAuth);
 
 app.use("/api/anthropic", async (req, res) => {
+  // Method/model gate first: an invalid method or model gets its 405/400 even
+  // when the key is missing, and the key is never read for a rejected request.
+  if (!requireAllowedModel(req, res, ALLOWED_ANTHROPIC_MODELS)) return;
   const key = requireEnv(res, "ANTHROPIC_API_KEY");
   if (!key) return;
-  if (!requireAllowedModel(req, res, ALLOWED_ANTHROPIC_MODELS)) return;
 
   await proxyToProvider(
     req,
@@ -284,9 +286,9 @@ app.use("/api/anthropic", async (req, res) => {
 // Registered before the chat-completions catch-all so it matches first.
 // Same minimal-headers approach: forwarding browser headers triggers HTTP 421 on OpenAI's CDN.
 app.use("/api/openai/v1/embeddings", async (req, res) => {
+  if (!requireAllowedModel(req, res, ALLOWED_OPENAI_EMBEDDING_MODELS)) return;
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
-  if (!requireAllowedModel(req, res, ALLOWED_OPENAI_EMBEDDING_MODELS)) return;
   try {
     const upstreamRes = await fetch("https://api.openai.com/v1/embeddings", {
       method: req.method,
@@ -307,9 +309,9 @@ app.use("/api/openai/v1/embeddings", async (req, res) => {
 });
 
 app.use("/api/openai", async (req, res) => {
+  if (!requireAllowedModel(req, res, ALLOWED_OPENAI_MODELS)) return;
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
-  if (!requireAllowedModel(req, res, ALLOWED_OPENAI_MODELS)) return;
 
   // Pin to the chat-completions endpoint. Do NOT forward arbitrary client paths
   // to api.openai.com: with only the shared access token, a caller could otherwise
@@ -350,6 +352,12 @@ const ALLOWED_GEMINI_MODELS = new Set([
 ]);
 
 app.use("/api/gemini", async (req, res) => {
+  // Same POST-only rule as the other keyed routes (Gemini's model gate is the
+  // path allowlist below rather than a body check, but the method gate matches).
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed." });
+    return;
+  }
   // Accept either name, matching .env.example and the Vite dev proxy
   // (GOOGLE_API_KEY is the primary; GEMINI_API_KEY is the legacy fallback).
   const key = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;

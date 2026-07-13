@@ -38,7 +38,10 @@ jobs:
       - name: Run npm audit (high/critical — enforcing)
         run: npm audit --audit-level=high
 
+      # if: always() so the artifact exists even when the enforcing gate above
+      # correctly fails — that's exactly when the report is most needed.
       - name: Run npm audit with JSON output (advisory report)
+        if: always()
         run: npm audit --json > npm-audit-report.json
         continue-on-error: true
 
@@ -216,7 +219,7 @@ jobs:
 
           # Broken-access-control protection: every keyed provider route must
           # validate the request model against a per-provider allowlist.
-          for token in requireAllowedModel ALLOWED_ANTHROPIC_MODELS ALLOWED_OPENAI_MODELS ALLOWED_GEMINI_MODELS; do
+          for token in requireAllowedModel ALLOWED_ANTHROPIC_MODELS ALLOWED_OPENAI_MODELS ALLOWED_OPENAI_EMBEDDING_MODELS ALLOWED_GEMINI_MODELS; do
             if grep -q "$token" server.js; then
               echo "✓ server.js: $token present"
             else
