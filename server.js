@@ -76,6 +76,48 @@ function copyResponseHeaders(upstreamHeaders, res) {
   }
 }
 
+// ─── Per-provider model allowlists ────────────────────────────────────────────
+// The routes below pin the upstream *path*, but the request body still names the
+// model. Without an allowlist, anyone holding the shared access token can spend
+// the operator's key on arbitrarily expensive models (denial-of-wallet). Defaults
+// match src/config.js; extend without a code push via the corresponding
+// ARM_ALLOWED_*_MODELS env var (comma-separated model ids).
+function modelAllowlist(envName, defaults) {
+  const raw = process.env[envName];
+  if (!raw) return new Set(defaults);
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+const ALLOWED_ANTHROPIC_MODELS = modelAllowlist("ARM_ALLOWED_ANTHROPIC_MODELS", ["claude-sonnet-4-6"]);
+const ALLOWED_OPENAI_MODELS = modelAllowlist("ARM_ALLOWED_OPENAI_MODELS", ["gpt-5.5-2026-04-23"]);
+const ALLOWED_OPENAI_EMBEDDING_MODELS = modelAllowlist("ARM_ALLOWED_OPENAI_EMBEDDING_MODELS", [
+  "text-embedding-3-small",
+]);
+
+// Validate the JSON body's `model` against an allowlist. Returns the model id, or
+// null after writing the 4xx response. Only POST bodies are accepted on the keyed
+// provider routes — GET/HEAD have nothing to validate and nothing to spend.
+function requireAllowedModel(req, res, allowed) {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed." });
+    return null;
+  }
+  let model;
+  try {
+    const raw = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+    model = raw ? JSON.parse(raw).model : undefined;
+  } catch {
+    res.status(400).json({ error: "Invalid JSON body." });
+    return null;
+  }
+  if (typeof model !== "string" || !allowed.has(model)) {
+    res.status(400).json({
+      error: `Unsupported or missing model${typeof model === "string" ? ` "${model}"` : ""}. Allowed: ${[...allowed].join(", ")}.`,
+    });
+    return null;
+  }
+  return model;
+}
+
 function requireEnv(res, keyName) {
   const value = process.env[keyName];
   if (!value) {
@@ -223,6 +265,7 @@ app.use("/api", requireProxyAuth);
 app.use("/api/anthropic", async (req, res) => {
   const key = requireEnv(res, "ANTHROPIC_API_KEY");
   if (!key) return;
+  if (!requireAllowedModel(req, res, ALLOWED_ANTHROPIC_MODELS)) return;
 
   await proxyToProvider(
     req,
@@ -243,6 +286,7 @@ app.use("/api/anthropic", async (req, res) => {
 app.use("/api/openai/v1/embeddings", async (req, res) => {
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
+  if (!requireAllowedModel(req, res, ALLOWED_OPENAI_EMBEDDING_MODELS)) return;
   try {
     const upstreamRes = await fetch("https://api.openai.com/v1/embeddings", {
       method: req.method,
@@ -265,12 +309,14 @@ app.use("/api/openai/v1/embeddings", async (req, res) => {
 app.use("/api/openai", async (req, res) => {
   const key = requireEnv(res, "OPENAI_API_KEY");
   if (!key) return;
+  if (!requireAllowedModel(req, res, ALLOWED_OPENAI_MODELS)) return;
 
   // Pin to the chat-completions endpoint. Do NOT forward arbitrary client paths
   // to api.openai.com: with only the shared access token, a caller could otherwise
   // spend the operator's key on fine-tuning, file uploads, assistants or pricier
   // models — broken access control / denial-of-wallet. The Anthropic and Gemini
-  // routes are likewise locked to a single upstream path.
+  // routes are likewise locked to a single upstream path, and all three validate
+  // the body's `model` against a per-provider allowlist.
   //
   // Use clean minimal headers — forwarding browser headers triggers HTTP 421
   // (Misdirected Request) on OpenAI's CDN due to HTTP/2 connection coalescing.
