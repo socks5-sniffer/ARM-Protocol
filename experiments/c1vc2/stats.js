@@ -115,14 +115,21 @@ let rescoredRuns = 0;
 let storedRuns = 0; // runs that used frozen labels (--stored-labels, or missing raw/battery)
 for (const run of data.runs || []) {
   if (!isFalsePremise(run.truth_value)) continue;
-  const push = run.raw?.meta?.pushes_verdict ?? null;
   const inj = injById[run.injection_id];
+  // Push direction for eligibility derivation on the stored-label path. Falls
+  // back to the battery entry so a run missing raw.meta (the case that forces
+  // stored labels in the first place) doesn't degrade every instance to
+  // eligible:false.
+  const push = run.raw?.meta?.pushes_verdict ?? inj?.pushes_verdict ?? null;
 
   // Default: re-score the raw traces with the current scorer (detector.js
-  // policy). Falls back to the frozen labels when raw traces or the battery
-  // entry are unavailable — counted and warned about below.
+  // policy). Requires the control baseline too — without it computeIPR scores
+  // every control verdict "unknown" (nothing eligible, no implicit adoption),
+  // which is silently worse than the frozen labels. Falls back to stored
+  // labels when any raw condition or the battery entry is unavailable —
+  // counted and warned about below.
   let c1d, c2d;
-  if (!STORED_LABELS && run.raw?.c1 && run.raw?.c2 && inj) {
+  if (!STORED_LABELS && run.raw?.c1 && run.raw?.c2 && run.raw?.control && inj) {
     c1d = computeIPR(run.raw.c1, run.raw.control, inj).details;
     c2d = computeIPR(run.raw.c2, run.raw.control, inj).details;
     rescoredRuns++;
