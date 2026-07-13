@@ -35,7 +35,7 @@ export const TOKENS_GAMMA = Number(import.meta.env.VITE_TOKENS_GAMMA || 8000); /
 // ─── Confidence-Δ band edges (descriptive only) ───────────────────────────────
 // These bound the direction/magnitude labels in analysis.js::driftLabel. They no
 // longer drive any action: confidence drift was falsified as a contamination
-// detector (experiments/c1vc2, AUC ≈ 0.44), so crossing DRIFT_UP_THRESHOLD is a
+// detector (experiments/c1vc2, within-Gemini AUC ≈ 0.50 — chance), so crossing DRIFT_UP_THRESHOLD is a
 // logged breadcrumb, not a trigger. The polarity/verdict-flip gate is the detector.
 export const DRIFT_UP_THRESHOLD   =  0.04;  // upper edge of the "minor shift" band
 export const DRIFT_DOWN_THRESHOLD = -0.15;  // lower edge → "large downward shift"

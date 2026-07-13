@@ -4,7 +4,8 @@ import { DRIFT_UP_THRESHOLD, DRIFT_DOWN_THRESHOLD } from "../config.js";
 // ─── Confidence-Δ label (descriptive only) ─────────────────────────────────────
 // Maps a confidence delta to a direction/magnitude label. These are DESCRIPTIVE,
 // not epistemic verdicts: the confidence-drift signal was falsified as a
-// contamination detector (experiments/c1vc2, AUC ≈ 0.44 — below chance), so the
+// contamination detector (experiments/c1vc2, within-Gemini AUC ≈ 0.50 — chance;
+// the pooled AUC ≈ 0.38 is provider-confounded, not "below chance"), so the
 // old "epistemic tightening" / "memetic drift" judgments are gone. The label
 // reports which way and how far confidence moved; the polarity/verdict-flip gate
 // is what actually flags a problematic run.

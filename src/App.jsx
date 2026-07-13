@@ -241,8 +241,10 @@ ${questionBlock(question)}
 
     // Confidence-drift diagnostic — LOGGED ONLY (no longer drives re-dispatch).
     // The confidence-drift signal was falsified as a contamination detector
-    // (experiments/c1vc2: AUC ≈ 0.44, below chance; 0 of 33 real adoptions caught
-    // by the magnitude flag). A +0.04 upward delta therefore no longer triggers an
+    // (experiments/c1vc2: at chance within the only provider that produced
+    // contamination — within-Gemini AUC ≈ 0.50; pooled AUC ≈ 0.38 is provider-
+    // confounded — and 0 of 28 real adoptions caught by the magnitude flag).
+    // A +0.04 upward delta therefore no longer triggers an
     // isolation requeue or a memetic/epistemic classification — those verdicts rode
     // on an at-chance signal. It is recorded as a breadcrumb only; the polarity /
     // verdict-flip gate below is the primary drift detector.
@@ -802,7 +804,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v{ARM_VERSION}: confidence Δ is descriptive only (unvalidated — AUC ≈ 0.44 as a detector; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ &lt; 0 = downward shift · Δ = 0 = no shift · the polarity/verdict-flip gate is the detector<br/>
+            v{ARM_VERSION}: confidence Δ is descriptive only (at chance as a detector — within-Gemini AUC ≈ 0.50; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ &lt; 0 = downward shift · Δ = 0 = no shift · the polarity/verdict-flip gate is the detector<br/>
             Gamma Δ measured vs its γ-silent baseline · two independent Gamma R1 draws feed the consensus polarity gate<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>
