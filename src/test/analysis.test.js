@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from 'vitest';
-import { driftLabel, extractClaimDirection, classifyVerdictTransition } from '../lib/analysis.js';
+import { driftLabel, extractClaimDirection, classifyVerdictTransition, classifyGammaPolarity } from '../lib/analysis.js';
 import {
   computeConvergence,
   computeTFIDFCosine,
@@ -45,6 +45,60 @@ describe('driftLabel', () => {
     expect(driftLabel(NaN).label).toBe('⚠ invalid delta');
     expect(driftLabel(Infinity).label).toBe('⚠ invalid delta');
     expect(driftLabel({}).label).toBe('⚠ invalid delta');
+  });
+});
+
+// ─── classifyGammaPolarity (consensus-baseline resolution for the gate) ────────
+describe('classifyGammaPolarity', () => {
+  it('gates against the consensus when both Gamma R1 draws agree', () => {
+    const r = classifyGammaPolarity({ r1: 'no', silent: 'no', r2: 'yes', silentIsGamma: true });
+    expect(r.mode).toBe('consensus');
+    expect(r.baselinesAgree).toBe(true);
+    expect(r.transition).toBe('flip'); // contradicts BOTH independent R1 draws
+  });
+
+  it('reports "none" when R2 holds the agreed prior', () => {
+    const r = classifyGammaPolarity({ r1: 'no', silent: 'no', r2: 'no', silentIsGamma: true });
+    expect(r.mode).toBe('consensus');
+    expect(r.transition).toBe('none');
+  });
+
+  it('declares the baseline unstable when the two R1 draws disagree — gate not evaluated', () => {
+    // The 8-of-19 historical case: R2 agrees with the silent anchor it was shown,
+    // but the differently-sampled visible R1 said otherwise. Not a flip.
+    const r = classifyGammaPolarity({ r1: 'no', silent: 'yes', r2: 'yes', silentIsGamma: true });
+    expect(r.mode).toBe('unstable');
+    expect(r.baselinesAgree).toBe(false);
+    expect(r.transition).toBe('not_evaluated');
+  });
+
+  it('treats conditional-vs-firm disagreement between the draws as unstable too', () => {
+    const r = classifyGammaPolarity({ r1: 'yes', silent: 'conditional', r2: 'no', silentIsGamma: true });
+    expect(r.mode).toBe('unstable');
+    expect(r.transition).toBe('not_evaluated');
+  });
+
+  it('falls back to visible-R1-only when the silent baseline is rotated to another agent', () => {
+    const r = classifyGammaPolarity({ r1: 'no', silent: 'yes', r2: 'yes', silentIsGamma: false });
+    expect(r.mode).toBe('visible_r1_only');
+    expect(r.baselinesAgree).toBeNull();
+    expect(r.transition).toBe('flip'); // legacy comparison, recorded as such
+  });
+
+  it('falls back to visible-R1-only when a baseline verdict is unparseable', () => {
+    const r = classifyGammaPolarity({ r1: 'no', silent: 'unknown', r2: 'yes', silentIsGamma: true });
+    expect(r.mode).toBe('visible_r1_only');
+    expect(r.transition).toBe('flip');
+    // and if the visible R1 itself is unknown, nothing can be asserted:
+    const r2 = classifyGammaPolarity({ r1: 'unknown', silent: 'no', r2: 'yes', silentIsGamma: true });
+    expect(r2.mode).toBe('visible_r1_only');
+    expect(r2.transition).toBe('unknown');
+  });
+
+  it('classifies a consensus hedge to conditional as a shift, not a flip', () => {
+    const r = classifyGammaPolarity({ r1: 'yes', silent: 'yes', r2: 'conditional', silentIsGamma: true });
+    expect(r.mode).toBe('consensus');
+    expect(r.transition).toBe('shift');
   });
 });
 

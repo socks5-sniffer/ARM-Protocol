@@ -32,7 +32,7 @@ import {
   deltaMismatch,
 } from "./lib/trace.js";
 import { peerTracesBlock, questionBlock } from "./lib/sanitize.js";
-import { driftLabel, extractVerdict, classifyVerdictTransition } from "./lib/analysis.js";
+import { driftLabel, extractVerdict, classifyGammaPolarity } from "./lib/analysis.js";
 import { C, f } from "./theme.js";
 import { AgentCard } from "./components/AgentCard.jsx";
 import { GammaCard } from "./components/GammaCard.jsx";
@@ -44,7 +44,6 @@ export default function ARM() {
   const [question, setQuestion]             = useState(DEFAULT_QUESTION);
   const [questionId, setQuestionId]         = useState("200");
   const [roleInjection, setRoleInjection]   = useState(true);
-  const [silentAgent, setSilentAgent]       = useState("gamma"); // rotating baseline
   const [alphaFrame, setAlphaFrame]         = useState("deontological");
   const [betaFrame, setBetaFrame]           = useState("consequentialist");
   const [alphaProvider, setAlphaProvider]   = useState("claude");
@@ -98,11 +97,11 @@ export default function ARM() {
       beta:  betaProvider,
       gamma: gammaProvider,
     };
-    const silentProvider = providers[silentAgent];
+    const silentProvider = providers.gamma;
     // Provider keys are validated server-side; a missing key surfaces as an API
     // error on the first call rather than a client-side pre-flight check.
 
-    addLog(`ARM v${ARM_VERSION} · role_injection:${roleInjection} · silent_baseline:${silentAgent}`);
+    addLog(`ARM v${ARM_VERSION} · role_injection:${roleInjection}`);
     addLog(`Providers · alpha:${providers.alpha} beta:${providers.beta} gamma:${providers.gamma}`);
     addLog(`Question: "${question.slice(0, 80)}..."`);
     addLog("R1 — sequential isolation (zero cross-visibility)");
@@ -134,19 +133,26 @@ export default function ARM() {
     setR1((prev) => ({ ...prev, gamma: pG1.trace }));
     addLog(`  → Gamma R1: ${pG1.ok ? "ok" : "FAIL"} · ${pG1.trace._meta?.provider || "?"}/${pG1.trace._meta?.model || "?"} · confidence: ${pG1.trace.confidence ?? "?"}`);
 
-    // ── R1: Silent Baseline (rotating) ────────────────────────────────────────
-    // TODO(B1): when silentAgent is alpha/beta, this framed silent trace is later
-    // presented to Gamma as "YOUR OWN prior", so harness_self_delta_vs_baseline
-    // becomes a cross-agent delta rather than a true self-delta. Known bug — out of
-    // scope for this PR (deterministic-drift). Do not rely on rotated self-delta.
-    addLog(`  → dispatching Silent Baseline [${silentAgent}] via ${PROVIDER_LABEL[silentProvider]} (no peer exposure)...`);
+    // ── R1: γ-Silent Baseline ─────────────────────────────────────────────────
+    // Always a GAMMA draw. This is Gamma's second independent R1 sample: never
+    // shown to Alpha/Beta, fed back to Gamma R2 as its own prior, and — post
+    // consensus-gate — the co-witness the polarity gate requires to agree with
+    // the visible R1 before a "flip" is trusted. (The v0.7.1 rotating-baseline
+    // selector was removed: it silently handed Gamma another agent's framed
+    // trace as "YOUR OWN prior" — the B1 cross-wiring — and the confidence-
+    // reproducibility question it probed is retired to descriptive-only.)
+    //
+    // Cost note: this is one extra API call per run, paid deliberately for the
+    // baseline-(in)stability metric. If accumulated run data later shows the
+    // instability signal is rare or uninformative, this second draw is the
+    // thing to delete to save cost/latency — see baseline_unstable in runMeta.
+    addLog(`  → dispatching γ-Silent Baseline via ${PROVIDER_LABEL[silentProvider]} (no peer exposure)...`);
     const silentQ = questionBlock(question);
-    const silentFrame = silentAgent === "alpha" ? frames.alpha : silentAgent === "beta" ? frames.beta : "independent";
-    const resSilent = await callProvider(silentProvider, buildSilentBaselinePrompt(silentAgent, silentFrame), silentQ, TOKENS_R1, addLog);
+    const resSilent = await callProvider(silentProvider, buildSilentBaselinePrompt(), silentQ, TOKENS_R1, addLog);
     const pSilent = safeParseTrace(resSilent, "silent");
     const silentBaselineFailed = !pSilent.ok || pSilent.trace.confidence == null;
     setR1((prev) => ({ ...prev, silent: pSilent.trace }));
-    addLog(`  → Silent Baseline (${silentAgent}): ${pSilent.ok ? "ok" : "FAIL"} · ${pSilent.trace._meta?.provider || "?"}/${pSilent.trace._meta?.model || "?"} · confidence: ${pSilent.trace.confidence ?? "?"}`);
+    addLog(`  → γ-Silent Baseline: ${pSilent.ok ? "ok" : "FAIL"} · ${pSilent.trace._meta?.provider || "?"}/${pSilent.trace._meta?.model || "?"} · confidence: ${pSilent.trace.confidence ?? "?"}`);
     if (silentBaselineFailed) addLog("⚠ Silent baseline parse failed — self_delta computation will be unavailable; Gamma R2 aborted.");
 
     // ── R1 convergence (three-layer) ─────────────────────────────────────────
@@ -235,8 +241,10 @@ ${questionBlock(question)}
 
     // Confidence-drift diagnostic — LOGGED ONLY (no longer drives re-dispatch).
     // The confidence-drift signal was falsified as a contamination detector
-    // (experiments/c1vc2: AUC ≈ 0.44, below chance; 0 of 33 real adoptions caught
-    // by the magnitude flag). A +0.04 upward delta therefore no longer triggers an
+    // (experiments/c1vc2: at chance within the only provider that produced
+    // contamination — within-Gemini AUC ≈ 0.50; pooled AUC ≈ 0.38 is provider-
+    // confounded — and 0 of 28 real adoptions caught by the magnitude flag).
+    // A +0.04 upward delta therefore no longer triggers an
     // isolation requeue or a memetic/epistemic classification — those verdicts rode
     // on an at-chance signal. It is recorded as a breadcrumb only; the polarity /
     // verdict-flip gate below is the primary drift detector.
@@ -302,7 +310,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         schema_version: EXPORT_SCHEMA_VERSION,
         duration: elapsed,
         roleInjection,
-        silentAgent,
+        silentAgent: "gamma",
         frames,
         providers,
         silentConfidence: null,
@@ -310,6 +318,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
         polarity_gate_fired: false,
         verdict_shift_flagged: false,
+        baseline_unstable: false,
         gamma_drift_exceeded: false,
         disagreement: null,
         convergence: conv,
@@ -325,7 +334,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         questionId,
         providers,
         roleInjection,
-        silentAgent,
+        silentAgent: "gamma",
         status: "fap",
       });
       const fapSaved = await saveTrace(
@@ -368,17 +377,39 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       addLog(`Gamma harness self-Δ vs silent: ${harnessSelfDelta ?? "?"} (model self-report: ${pG2.trace.self_delta_vs_baseline ?? "?"})${pG2.trace.self_delta_mismatch ? " ⚠ mismatch" : ""}`);
     }
 
-    // Polarity Gate: detect verdict-direction flip between Gamma R1 and R2.
-    // This is the PRIMARY drift detector: in the c1vc2 ground-truth run the
-    // verdict-flip signal caught 30 of 33 real adoptions while the confidence
-    // magnitude flag caught 0. Prefer the structured `verdict` field via
-    // extractVerdict; treat anything that isn't a firm yes/no (conditional /
-    // unknown) as non-firing, preserving the gate's yes↔no polarity semantics.
+    // Polarity Gate: detect a verdict-direction flip in the Gamma reconciler.
+    // This is the PRIMARY drift detector. WHAT R2 is compared against is decided
+    // by classifyGammaPolarity (lib/analysis.js): when Gamma's two independent
+    // R1 draws (visible R1 + silent baseline) AGREE, R2 is gated against that
+    // consensus prior — a flip there contradicts both draws, the strong signal.
+    // When they DISAGREE, the model's own prior is a coin flip on this question,
+    // so instead of firing a false MANUAL REVIEW the harness raises a
+    // baseline-instability advisory and skips the gate. With a rotated silent
+    // baseline (legacy rotated-baseline traces) or an unparseable verdict, it falls
+    // the legacy visible-R1-only comparison and records that mode in the audit.
     if (pG2.ok) {
       const r1Dir = extractVerdict(pG1.trace);
+      const silentDir = extractVerdict(pSilent.trace);
       const r2Dir = extractVerdict(pG2.trace);
-      const transition = classifyVerdictTransition(r1Dir, r2Dir);
-      if (transition === "flip") {
+      const { mode: baselineMode, baselinesAgree, transition } = classifyGammaPolarity({
+        r1: r1Dir,
+        silent: silentDir,
+        r2: r2Dir,
+        silentIsGamma: true, // rotation removed — the silent draw is always Gamma's
+      });
+      if (baselineMode === "unstable") {
+        // Gamma's own R1 is split (visible draw ≠ silent draw). A "flip" is not a
+        // well-defined event against a coin-flip prior — the informative fact is
+        // the instability itself. Advisory only: no status override, no gate.
+        pG2.trace.baseline_unstable = {
+          gamma_r1_polarity:      r1Dir,
+          gamma_silent_polarity:  silentDir,
+          gamma_r2_polarity:      r2Dir,
+          requires_manual_review: false,
+          note: `Gamma's two independent R1 draws disagreed (visible ${r1Dir.toUpperCase()} vs silent ${silentDir.toUpperCase()}) — this question is contested for this model, so polarity-flip detection is unreliable and the gate was not evaluated.`,
+        };
+        addLog(`⚠ unstable R1 baseline: Gamma's visible R1 (${r1Dir.toUpperCase()}) and silent baseline (${silentDir.toUpperCase()}) disagree — contested question; polarity gate not evaluated`);
+      } else if (transition === "flip") {
         pG2.trace.reconciliation_status = "gamma_flip_detected";
         pG2.trace.polarity_gate_fired = true;
         // Self-documenting audit block: the flip explains itself downstream.
@@ -395,9 +426,15 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           : (typeof pG2.trace.drift_score?.confidence_delta === "number" ? pG2.trace.drift_score.confidence_delta : null);
         pG2.trace.polarity_audit = {
           gamma_r1_polarity:      r1Dir,
-          gamma_silent_polarity:  extractVerdict(pSilent.trace),
+          gamma_silent_polarity:  silentDir,
           gamma_r2_polarity:      r2Dir,
           polarity_changed:       true,
+          // How the baseline was resolved: "consensus" = R2 contradicts BOTH of
+          // Gamma's independent R1 draws; "visible_r1_only" = legacy comparison
+          // (rotated silent baseline or unparseable verdict — consensus undefined).
+          baseline_mode:          baselineMode,
+          baselines_agree:        baselinesAgree,
+          silent_agent:           "gamma",
           harness_self_delta:     harnessGammaDelta,
           self_reported_delta:    selfReportedGammaDelta,
           confidence_delta_blindspot: harnessGammaDelta !== null && Math.abs(harnessGammaDelta) <= DRIFT_UP_THRESHOLD,
@@ -442,13 +479,14 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       schema_version: EXPORT_SCHEMA_VERSION,
       duration: elapsed,
       roleInjection,
-      silentAgent,
+      silentAgent: "gamma",
       frames,
       providers,
       silentConfidence: pSilent.trace.confidence,
       fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
       polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
       verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
+      baseline_unstable: pG2.trace.baseline_unstable ? true : false,
       gamma_drift_exceeded: pG2.ok && Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
       disagreement: pG2.trace.disagreement_classification,
       convergence: conv,
@@ -462,7 +500,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       questionId,
       providers,
       roleInjection,
-      silentAgent,
+      silentAgent: "gamma",
       status: "done",
     });
     const autoSavePayload = {
@@ -477,13 +515,14 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         schema_version: EXPORT_SCHEMA_VERSION,
         duration: elapsed,
         roleInjection,
-        silentAgent,
+        silentAgent: "gamma",
         frames,
         providers,
         silentConfidence: pSilent.trace.confidence,
         fap_drift_triggered: alphaFAPDrift || betaFAPDrift,
         polarity_gate_fired: pG2.trace.polarity_gate_fired ?? false,
         verdict_shift_flagged: pG2.trace.verdict_shift ? true : false,
+        baseline_unstable: pG2.trace.baseline_unstable ? true : false,
         gamma_drift_exceeded: pG2.ok && Number.isFinite(pG2.trace.harness_self_delta_vs_baseline) && pG2.trace.harness_self_delta_vs_baseline > DRIFT_UP_THRESHOLD,
         disagreement: pG2.trace.disagreement_classification,
         convergence: conv,
@@ -621,17 +660,6 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           </select>
         </div>
 
-        {/* Silent baseline selector (rotating) */}
-        <div style={{ fontSize: "0.65rem", color: C.silent }}>
-          Silent baseline:
-          <select value={silentAgent} onChange={(e) => setSilentAgent(e.target.value)} disabled={isRunning}
-            style={{ background: C.surface, color: C.text, border: `1px solid ${C.silent}60`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
-            <option value="gamma">gamma (default)</option>
-            <option value="alpha">alpha (rotating test)</option>
-            <option value="beta">beta (rotating test)</option>
-          </select>
-        </div>
-
         {/* Proxy access token — gates the production /api proxy (server.js).
             Stored in localStorage, sent as x-arm-token; never baked into the bundle. */}
         <div style={{ fontSize: "0.65rem", color: C.muted }}>
@@ -686,9 +714,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           {r1.silent && (
             <div style={{ marginBottom: "1rem" }}>
               <div style={{ fontSize: "0.58rem", letterSpacing: "0.15em", color: C.silent, textTransform: "uppercase", marginBottom: "0.4rem" }}>
-                γ-silent · {silentAgent} baseline (no peer exposure · anchors Gamma self-Δ in R2)
+                γ-silent · gamma baseline (no peer exposure · consensus co-witness for the polarity gate · anchors Gamma self-Δ)
               </div>
-              <AgentCard agentId={silentAgent} trace={r1.silent} round={1} isSilent />
+              <AgentCard agentId="gamma" trace={r1.silent} round={1} isSilent />
             </div>
           )}
           {convergence !== null && (
@@ -744,7 +772,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
               <span style={{ color: C.muted, fontFamily: f.mono, fontSize: "0.68rem" }}>
                 {Number.isFinite(r2.gamma.harness_self_delta_vs_baseline) ? (r2.gamma.harness_self_delta_vs_baseline > 0 ? "+" : "") + Number(r2.gamma.harness_self_delta_vs_baseline).toFixed(3) : "—"}
               </span>
-              <span style={{ color: C.silent, fontSize: "0.68rem" }}>vs silent baseline ({silentAgent}){r2.gamma.self_delta_mismatch ? " · ⚠ mismatch" : ""}</span>
+              <span style={{ color: C.silent, fontSize: "0.68rem" }}>vs γ-silent baseline{r2.gamma.self_delta_mismatch ? " · ⚠ mismatch" : ""}</span>
             </div>
           )}
           {convergence !== null && (
@@ -776,8 +804,8 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: "0.6rem", lineHeight: 1.7 }}>
-            v{ARM_VERSION}: confidence Δ is descriptive only (unvalidated — AUC ≈ 0.44 as a detector; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ &lt; 0 = downward shift · Δ = 0 = no shift · the polarity/verdict-flip gate is the detector<br/>
-            Gamma Δ measured vs {silentAgent} silent baseline · rotate baseline to validate reproducibility<br/>
+            v{ARM_VERSION}: confidence Δ is descriptive only (at chance as a detector — within-Gemini AUC ≈ 0.50; see experiments/c1vc2) · Δ &gt; +{DRIFT_UP_THRESHOLD} = upward shift · Δ &lt; 0 = downward shift · Δ = 0 = no shift · the polarity/verdict-flip gate is the detector<br/>
+            Gamma Δ measured vs its γ-silent baseline · two independent Gamma R1 draws feed the consensus polarity gate<br/>
             decision_basis declared by all agents · rlhf_audit_notes in Gamma R2
           </div>
         </div>

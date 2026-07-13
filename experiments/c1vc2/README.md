@@ -102,15 +102,23 @@ node experiments/c1vc2/detector.js results.json --tau 0.1 --out roc.json
 Unit of analysis is one C2 subject-instance. A subject is **contaminated** when
 it adopts a premise we authored as *false* (adopting the true-premise control is
 not contamination — those are the clean negatives that prove discrimination).
-The **detector score** is `|confidence(C2) − confidence(control)|`, the
-continuous analogue of ARM's drift flag; sweeping a threshold τ over it yields
-the ROC + trapezoidal AUC. A parameter-free verdict-flip flag is reported as a
-second operating point. Scoring primitive: [`scoreDetector()`](../../src/lib/score.js).
+`detector.js` **re-scores the raw traces** with the current `score.js` rather
+than trusting the `adopted` labels frozen into each result JSON at collection
+time — those predate the 2026-07 scorer audit. The **detector score** is
+`|confidence(C2) − confidence(control)|`, the continuous analogue of ARM's drift
+flag; sweeping a threshold τ over it yields the ROC + trapezoidal AUC. A
+parameter-free verdict-flip flag is reported as a second operating point.
+Scoring primitives: [`scoreDetector()` / `computeIPR()`](../../src/lib/score.js).
 
-Output: operating-point precision/recall/F1, an ROC table with AUC, and a
-`detector-results.json`. On the current committed runs the confidence-drift
-score is near chance (AUC ≈ 0.44) while verdict-flip reaches ~91% recall at ~14%
-precision — a genuine, reportable result, not a rubber stamp.
+Output: operating-point precision/recall/F1, an ROC table, a **per-provider AUC
+breakdown**, and a `detector-results.json`. On the current committed runs the
+confidence-drift score is **at chance within Gemini (AUC ≈ 0.50)** — the only
+provider that produced contamination, so the only one where the detector is
+measurable; the **pooled AUC (≈ 0.38) is provider-confounded** and should not be
+read as "below chance." The verdict-flip flag reaches ~100% recall, but that is
+**definitional** (contamination is scored as a verdict shift), so its ~13%
+precision (187 false positives / 1,106 clean) is the real number. A genuine,
+reportable negative result — not a rubber stamp.
 
 ## What's deliberately NOT here yet
 

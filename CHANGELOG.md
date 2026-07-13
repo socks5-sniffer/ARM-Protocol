@@ -9,6 +9,34 @@ trace-schema changes.
 
 ## [Unreleased]
 
+### Changed
+- **Polarity gate now resolves its baseline against a Gamma R1 *consensus*.** The
+  gate previously compared Gamma R2 against the visible R1 draw (`pG1`) alone —
+  but R2 is prompted with the *silent* baseline as its prior, and the two draws
+  are independent stochastic samples that disagree from ordinary generation
+  noise. A new `classifyGammaPolarity()` helper (`src/lib/analysis.js`) splits on
+  whether the two draws agree:
+  - **Both agree** → gate compares R2 against that consensus; a flip contradicts
+    *both* independent statements of Gamma's prior (the strong signal). Fires
+    exactly as before (`polarity_audit`, manual review).
+  - **They disagree** → the model's own prior is a coin flip on this question, so
+    a "flip" is undefined. The gate is **not evaluated**; instead a
+    `baseline_unstable` advisory is written (`requires_manual_review: false`) with
+    an amber UI badge. No status override.
+  - **Rotated silent baseline (`silentAgent ≠ gamma`) or an unparseable verdict**
+    → consensus is undefined, so the gate falls back to the legacy
+    visible-R1-only comparison and records `baseline_mode: "visible_r1_only"` in
+    the audit (the pre-existing cross-agent-comparison caveat, B1, is unchanged
+    and now explicitly labeled rather than silent).
+  The `polarity_audit` block gains `baseline_mode`, `baselines_agree`, and
+  `silent_agent`; `runMeta` gains `baseline_unstable`. On the committed traces
+  this reclassifies the 9 rotated-baseline firings as legacy-fallback and leaves
+  all 10 default-config firings (genuine consensus reversals) firing unchanged.
+- **`verdict` is now schema-validated at parse time.** A missing or out-of-enum
+  `verdict` is a non-fatal `schema_warnings` entry (`verdict_missing_or_invalid`)
+  rather than passing silently — the field is load-bearing for the polarity gate,
+  and without it `extractVerdict` degrades to brittle claim-text regex parsing.
+
 ### Added
 - **Verdict-shift advisory flag.** A signal weaker than the polarity gate: when the
   Gamma reconciler's verdict moves *involving* `conditional` (a firm `yes`/`no`
@@ -23,8 +51,8 @@ trace-schema changes.
 ### Changed
 - **Confidence-drift retired as a detector.** The C1-vs-C2 injection experiment
   (`experiments/c1vc2`) scored ARM's confidence-drift signal against ground truth
-  at **AUC ≈ 0.44** (below chance; 0 of 33 real false-premise adoptions caught by
-  the magnitude flag vs. 30 by verdict-flip). Consequences:
+  at **chance** (within-Gemini AUC ≈ 0.50 — the only provider with contamination;
+  0 of 28 real false-premise adoptions caught by the magnitude flag). Consequences:
   - **FAP isolation re-dispatch disabled** — a +0.04 Alpha/Beta R2 delta is now a
     logged `fap_drift_triggered` breadcrumb, not a re-dispatch plus
     `memetic`/`epistemic` classification.
@@ -38,8 +66,38 @@ trace-schema changes.
 
 ### Removed
 - `fap_requeue` block from run output — isolation re-dispatch no longer occurs.
+- **Rotating silent-baseline selector (resolves B1 by removal).** The v0.7.1
+  `silentAgent` selector existed to test whether baseline-confidence
+  reproducibility was a protocol property — a question retired now that
+  confidence is descriptive-only. Its wiring was never forked from production:
+  with `silentAgent: alpha|beta` the harness handed Gamma *another agent's
+  framed trace* labeled "YOUR OWN prior" (the known B1 cross-wiring), which
+  also corrupted the polarity gate's baseline (9 of the 19 historical gate
+  firings were rotated-mode cross-agent comparisons). The silent baseline is
+  now **always a second Gamma draw** — required, since the consensus polarity
+  gate uses it as co-witness. Exported traces keep `silentAgent: "gamma"` for
+  schema stability; `classifyGammaPolarity()` retains the `visible_r1_only`
+  fallback so legacy rotated-mode traces remain analyzable. The second Gamma
+  call is a deliberate cost paid for the baseline-(in)stability metric; if
+  accumulated data shows instability is rare/uninformative, that call is the
+  designated future cost cut (noted in-code).
 
 ### Fixed
+- **Detector analysis re-scores from raw traces + per-provider AUC**
+  (`experiments/c1vc2/detector.js`). It previously read the `adopted`/`verdict`
+  labels frozen into the result JSONs, which predate the scorer audit — so its
+  `detector-results.json` reproduced the removed false positives (33 contaminated
+  → **28** once re-scored; pooled AUC 0.439 → 0.381). More importantly, the
+  pooled AUC is **provider-confounded**: all 28 contaminated instances are
+  Gemini, so a pooled ROC compares one provider's positives against a
+  mixed-provider negative pool. `detector.js` now re-scores from raw via
+  `computeIPR` and reports a per-provider breakdown. The honest read is
+  **within-Gemini AUC ≈ 0.50 (chance)**; GPT and Claude produced no contamination
+  so their AUC is undefined. Also documents that the verdict-flip flag's ~100%
+  recall is **definitional** (contamination is scored as a verdict shift) — its
+  ~13% precision is the informative number. Conclusion (confidence drift is not a
+  usable detector) is unchanged; the "below chance across models" framing was an
+  artifact and is corrected in the README.
 - **C1-vs-C2 scorer audit** (`src/lib/score.js`). Two artifacts found in the
   experiment's own scorer, not the protocol: (1) implicit adoption is
   structurally unmeasurable when a subject's baseline already equals the push

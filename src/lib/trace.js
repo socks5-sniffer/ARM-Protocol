@@ -42,6 +42,15 @@ export function safeParseTrace(rawResult, agentId) {
       schema_warnings.push(`confidence_out_of_range:${conf}`);
     }
 
+    // verdict: the structured field the polarity gate keys on. A missing or
+    // out-of-enum verdict is non-fatal (extractVerdict falls back to parsing the
+    // claim text) but it degrades the PRIMARY detector to brittle regex guessing,
+    // so it is surfaced as a schema warning rather than passing silently.
+    const vd = parsed.verdict;
+    if (typeof vd !== "string" || !["yes", "no", "conditional"].includes(vd.trim().toLowerCase())) {
+      schema_warnings.push(`verdict_missing_or_invalid:${JSON.stringify(vd)}`);
+    }
+
     // drift_score.confidence_delta: when present, finite in [-1,1] (non-fatal warning).
     const cd = parsed.drift_score?.confidence_delta;
     if (cd !== undefined && cd !== null &&

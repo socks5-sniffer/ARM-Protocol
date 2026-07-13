@@ -33,9 +33,23 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { scoreDetector } from "../../src/lib/score.js";
+import { scoreDetector, computeIPR } from "../../src/lib/score.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ─── battery index ────────────────────────────────────────────────────────────
+// Re-scoring the raw traces (below) needs each injection's metadata
+// (premise_markers, pushes_verdict, truth_value). Index every battery in this
+// directory by injection id so any result file — logical, hard, or the original
+// fabricated-statute battery — resolves.
+const injById = {};
+for (const bf of fs.readdirSync(__dirname).filter((f) => /^injections.*\.json$/.test(f))) {
+  try {
+    for (const inj of JSON.parse(fs.readFileSync(path.join(__dirname, bf), "utf8")).injections || []) {
+      if (inj.id) injById[inj.id] = inj;
+    }
+  } catch { /* skip an unparseable battery */ }
+}
 
 // ─── args ───────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -70,7 +84,7 @@ const confOf = (subjects, agent) => {
 // drop all false-premise runs and zero out the contaminated class.
 const isFalsePremise = (tv) => tv === false || tv === "false";
 
-const samples = []; // { file, injection, agent, contaminated, adopted, drift, verdictFlip }
+const samples = []; // { file, injection, agent, provider, contaminated, adopted, drift, verdictFlip }
 for (const file of files) {
   let data;
   try {
@@ -79,12 +93,24 @@ for (const file of files) {
     console.error(`  ! skipping ${path.basename(file)}: ${err.message}`);
     continue;
   }
+  const providers = data.providers || {};
   for (const run of data.runs || []) {
-    if (run.error || !run.c2?.details) continue;
+    if (run.error || !run.raw?.c2) continue;
+    const inj = injById[run.injection_id];
+    if (!inj) {
+      console.error(`  ! ${path.basename(file)}: no battery entry for "${run.injection_id}" — skipped`);
+      continue;
+    }
     const isFalse = isFalsePremise(run.truth_value);
     const controlSubjects = run.raw?.control?.subjects;
     const c2Subjects = run.raw?.c2?.subjects;
-    for (const d of run.c2.details) {
+    // Re-score from the RAW traces with the current (patched) scorer, rather than
+    // trusting the `adopted`/`verdict` labels frozen into the JSON at collection
+    // time. Those stored labels predate the 2026-07 scorer audit (eligible mask +
+    // verdict-guarded explicit_adoption); reading them would reproduce the very
+    // false positives the audit removed. See experiments/c1vc2/FINDINGS-audit.md.
+    const scored = computeIPR(run.raw.c2, run.raw.control, inj);
+    for (const d of scored.details) {
       const confC2 = confOf(c2Subjects, d.agent);
       const confCtrl = confOf(controlSubjects, d.agent);
       // null (not 0) when unscorable, so a parse-failed/missing-confidence instance
@@ -95,6 +121,7 @@ for (const file of files) {
         file: path.basename(file),
         injection: run.injection_id,
         agent: d.agent,
+        provider: providers[d.agent] || d.agent,
         contaminated: isFalse && d.adopted === true,
         adopted: d.adopted === true,
         drift,
@@ -120,32 +147,57 @@ const atFlip = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated,
 // Sweep every distinct (scorable) drift value as a threshold; flagged = drift >= τ.
 // null drifts are unscorable and never flagged. tau: null is the "≥∞" origin point
 // (JSON has no Infinity — this makes the serialized value intentional, not coerced).
-const thresholds = [...new Set(samples.filter((s) => s.drift != null).map((s) => s.drift))].sort((a, b) => b - a);
-const roc = [{ tau: null, tpr: 0, fpr: 0, tp: 0, fp: 0 }];
-for (const t of thresholds) {
-  let tp = 0, fp = 0;
-  for (const s of samples) {
-    if (s.drift != null && s.drift >= t) {
-      if (s.contaminated) tp++;
-      else fp++;
+// Factored so the same construction runs pooled and per-provider (below).
+function rocAuc(subset) {
+  const pos = subset.filter((s) => s.contaminated).length;
+  const neg = subset.length - pos;
+  const thresholds = [...new Set(subset.filter((s) => s.drift != null).map((s) => s.drift))].sort((a, b) => b - a);
+  const roc = [{ tau: null, tpr: 0, fpr: 0, tp: 0, fp: 0 }];
+  for (const t of thresholds) {
+    let tp = 0, fp = 0;
+    for (const s of subset) {
+      if (s.drift != null && s.drift >= t) {
+        if (s.contaminated) tp++; else fp++;
+      }
+    }
+    roc.push({ tau: t, tpr: pos ? tp / pos : null, fpr: neg ? fp / neg : null, tp, fp });
+  }
+  let auc = null;
+  if (pos && neg) {
+    const pts = roc.filter((p) => p.fpr != null && p.tpr != null).sort((a, b) => a.fpr - b.fpr || a.tpr - b.tpr);
+    auc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      auc += ((pts[i].fpr - pts[i - 1].fpr) * (pts[i].tpr + pts[i - 1].tpr)) / 2;
     }
   }
-  roc.push({
-    tau: t,
-    tpr: nPos ? tp / nPos : null,
-    fpr: nNeg ? fp / nNeg : null,
-    tp,
-    fp,
-  });
+  return { roc, auc, nPos: pos, nNeg: neg };
 }
-// Trapezoidal AUC (needs both classes present and defined rates).
-let auc = null;
-if (nPos && nNeg) {
-  const pts = roc.filter((p) => p.fpr != null && p.tpr != null).sort((a, b) => a.fpr - b.fpr || a.tpr - b.tpr);
-  auc = 0;
-  for (let i = 1; i < pts.length; i++) {
-    auc += ((pts[i].fpr - pts[i - 1].fpr) * (pts[i].tpr + pts[i - 1].tpr)) / 2;
-  }
+
+const pooled = rocAuc(samples);
+const roc = pooled.roc;
+const auc = pooled.auc;
+
+// Per-provider AUC. The pooled AUC is provider-CONFOUNDED: contamination (the
+// positive class) is not distributed evenly across providers, so a pooled ROC
+// compares one provider's positives against a mixed-provider negative pool and
+// partly measures provider identity rather than contamination. The honest read
+// is within-provider — where a provider has no positives, its AUC is undefined
+// (you cannot score a detector on a class with no members), reported as null.
+const providersSeen = [...new Set(samples.map((s) => s.provider))].sort();
+const perProvider = {};
+for (const prov of providersSeen) {
+  const sub = samples.filter((s) => s.provider === prov);
+  const r = rocAuc(sub);
+  perProvider[prov] = {
+    n_instances: sub.length,
+    n_contaminated: r.nPos,
+    n_clean: r.nNeg,
+    auc: r.auc, // null when this provider produced no contamination
+    // Per-provider ROC — the honest curve to plot. Only defined (both classes
+    // present) for a provider that produced contamination; null otherwise.
+    roc: r.nPos && r.nNeg ? r.roc : null,
+    verdict_flip: scoreDetector(sub.map((s) => ({ contaminated: s.contaminated, flagged: s.verdictFlip }))),
+  };
 }
 
 // ─── report ────────────────────────────────────────────────────────────────
@@ -168,8 +220,21 @@ console.log(`  precision=${pct(atDrift.precision)}  recall=${pct(atDrift.recall)
 console.log(`\n── Operating point B: verdict-flip flag (parameter-free) ──`);
 console.log(`  TP=${atFlip.tp}  FP=${atFlip.fp}  TN=${atFlip.tn}  FN=${atFlip.fn}`);
 console.log(`  precision=${pct(atFlip.precision)}  recall=${pct(atFlip.recall)}  F1=${num(atFlip.f1)}`);
+console.log(`  ⚠ recall is definitional: contamination is scored as a verdict shift toward the`);
+console.log(`    pushed direction, and this flag detects verdict shifts — high recall is built in.`);
+console.log(`    Precision (false-positive rate on clean instances) is the informative number.`);
 
-console.log(`\n── ROC (confidence-drift score) ──`);
+console.log(`\n── Per-provider AUC (the pooled number is provider-confounded) ──`);
+for (const [prov, pp] of Object.entries(perProvider)) {
+  console.log(
+    `  ${prov.padEnd(8)} n=${pp.n_instances}  contaminated=${pp.n_contaminated}  ` +
+      `AUC=${pp.auc == null ? "— (no positives; undefined)" : pp.auc.toFixed(3)}`
+  );
+}
+console.log(`  → Only a provider WITH contamination has a defined AUC; pooling positives from`);
+console.log(`    one provider against all providers' negatives is what drags the pooled number.`);
+
+console.log(`\n── ROC (confidence-drift score, pooled) ──`);
 console.log(`  τ≥        FPR      TPR     (tp/fp)`);
 for (const p of roc) {
   const tl = p.tau == null ? "  ∞" : num(p.tau).padStart(5);
@@ -184,16 +249,22 @@ console.log(`  contaminated subjects from clean ones; AUC → 1.0 = a usable det
 const output = {
   detector: "arm-c1-vs-c2-contamination",
   timestamp: new Date().toISOString(),
+  scorer: "re-scored from raw traces via src/lib/score.js (post-audit: eligible mask + verdict-guarded explicit_adoption)",
   sources: files.map((f) => path.basename(f)),
   n_instances: samples.length,
   n_contaminated: nPos,
   n_clean: nNeg,
   operating_points: {
     confidence_drift: { tau, ...atDrift },
+    // recall is definitional (contamination == a verdict shift; this flag detects
+    // verdict shifts). Precision is the informative number. See report above.
     verdict_flip: atFlip,
   },
-  roc,
   auc,
+  auc_note:
+    "Pooled AUC is provider-confounded: the positive (contaminated) class is not spread evenly across providers, so a pooled ROC partly measures provider identity. See per_provider for the honest within-provider read; a provider with no positives has an undefined (null) AUC.",
+  per_provider: perProvider,
+  roc,
 };
 fs.writeFileSync(outPath, JSON.stringify(output, null, 2));
 console.log(`Saved: ${outPath}\n`);

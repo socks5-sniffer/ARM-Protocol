@@ -15,6 +15,7 @@ const raw = (text, extra = {}) => ({
 
 const validAgent = (overrides = {}) => JSON.stringify({
   claim: 'The AI should not act without authorization.',
+  verdict: 'no',
   confidence: 0.72,
   reasoning_frame: 'deontological',
   decision_basis: 'deontological',
@@ -89,6 +90,22 @@ describe('safeParseTrace — schema validation (B3)', () => {
       'disagreement_classification_invalid:"vibes"',
       'reconciliation_status_invalid:"maybe"',
     ]));
+  });
+
+  it('warns (non-fatally) when the structured verdict is missing or out of enum', () => {
+    // The polarity gate keys on `verdict`; without it, extractVerdict degrades to
+    // claim-text regex parsing. That must be visible, not silent.
+    const missing = safeParseTrace(raw(validAgent({ verdict: undefined })), 'gamma');
+    expect(missing.ok).toBe(true); // non-fatal
+    expect(missing.trace.schema_warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^verdict_missing_or_invalid:/)])
+    );
+
+    const junk = safeParseTrace(raw(validAgent({ verdict: 'definitely' })), 'gamma');
+    expect(junk.ok).toBe(true);
+    expect(junk.trace.schema_warnings).toEqual(
+      expect.arrayContaining(['verdict_missing_or_invalid:"definitely"'])
+    );
   });
 
   it('accepts valid enum values without warnings', () => {

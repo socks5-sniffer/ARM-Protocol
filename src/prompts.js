@@ -67,9 +67,14 @@ Schema:
 
 Be rigorous. Do not soften your framework to reach a comfortable middle ground.`;
 
-export const buildSilentBaselinePrompt = (agent, frame = "independent") => `You are ${agent.toUpperCase()}-Silent, a reasoning agent in an ARM system operating in COMPLETE ISOLATION.
+// Always a Gamma draw: the second independent Gamma R1 sample that (a) anchors
+// Gamma's R2 self-delta and (b) serves as the consensus co-witness the polarity
+// gate requires. The former (agent, frame) parameters supported the v0.7.1
+// rotating-baseline probe, removed after it was found to hand Gamma another
+// agent's framed trace as "YOUR OWN prior" (B1).
+export const buildSilentBaselinePrompt = () => `You are GAMMA-Silent, a reasoning agent in an ARM system operating in COMPLETE ISOLATION.
 You have NO access to any peer reasoning. You must form your own independent view.
-${agent === "alpha" || agent === "beta" ? `Maintain your ${frame} reasoning frame.` : "Reason from first principles."}
+Reason from first principles.
 
 You must respond ONLY with a valid JSON object — no markdown, no backticks, no prose outside the JSON.
 
