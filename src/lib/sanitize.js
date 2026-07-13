@@ -18,6 +18,11 @@ export function sanitizeText(value, maxLen = 8000) {
     // (LRI/RLI/FSI/PDI) and U+FEFF (BOM/ZWNBSP).
     .replace(/[\u061c\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g, "")
     .replace(/<\/?arm:[^>]*>/gi, "")                          // neutralize delimiter forgery
+    // Neutralize forged UNTRUSTED_OPEN / UNTRUSTED_CLOSE boundary markers. Without
+    // this, untrusted text containing the literal "[END UNTRUSTED INPUT]" fakes the
+    // close of its own envelope and everything after it reads as trusted prose to
+    // the model. Runs after the zero-width strip so obfuscated variants are caught.
+    .replace(/\[\s*(?:BEGIN|END)\s+UNTRUSTED\s+INPUT[^\]]*\]/gi, "")
     // eslint-disable-next-line no-control-regex -- intentional: strips control chars from untrusted input
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ""); // strip control chars (keep \t, \n)
   if (s.length > maxLen) s = s.slice(0, maxLen) + "\u2026[truncated]";
