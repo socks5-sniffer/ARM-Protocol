@@ -51,8 +51,8 @@ trace-schema changes.
 ### Changed
 - **Confidence-drift retired as a detector.** The C1-vs-C2 injection experiment
   (`experiments/c1vc2`) scored ARM's confidence-drift signal against ground truth
-  at **AUC ≈ 0.44** (below chance; 0 of 33 real false-premise adoptions caught by
-  the magnitude flag vs. 30 by verdict-flip). Consequences:
+  at **chance** (within-Gemini AUC ≈ 0.50 — the only provider with contamination;
+  0 of 28 real false-premise adoptions caught by the magnitude flag). Consequences:
   - **FAP isolation re-dispatch disabled** — a +0.04 Alpha/Beta R2 delta is now a
     logged `fap_drift_triggered` breadcrumb, not a re-dispatch plus
     `memetic`/`epistemic` classification.
@@ -83,6 +83,21 @@ trace-schema changes.
   designated future cost cut (noted in-code).
 
 ### Fixed
+- **Detector analysis re-scores from raw traces + per-provider AUC**
+  (`experiments/c1vc2/detector.js`). It previously read the `adopted`/`verdict`
+  labels frozen into the result JSONs, which predate the scorer audit — so its
+  `detector-results.json` reproduced the removed false positives (33 contaminated
+  → **28** once re-scored; pooled AUC 0.439 → 0.381). More importantly, the
+  pooled AUC is **provider-confounded**: all 28 contaminated instances are
+  Gemini, so a pooled ROC compares one provider's positives against a
+  mixed-provider negative pool. `detector.js` now re-scores from raw via
+  `computeIPR` and reports a per-provider breakdown. The honest read is
+  **within-Gemini AUC ≈ 0.50 (chance)**; GPT and Claude produced no contamination
+  so their AUC is undefined. Also documents that the verdict-flip flag's ~100%
+  recall is **definitional** (contamination is scored as a verdict shift) — its
+  ~13% precision is the informative number. Conclusion (confidence drift is not a
+  usable detector) is unchanged; the "below chance across models" framing was an
+  artifact and is corrected in the README.
 - **C1-vs-C2 scorer audit** (`src/lib/score.js`). Two artifacts found in the
   experiment's own scorer, not the protocol: (1) implicit adoption is
   structurally unmeasurable when a subject's baseline already equals the push

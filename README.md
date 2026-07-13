@@ -16,7 +16,7 @@ ARM research centers on a structural vulnerability in multi-agent AI: the **Pers
 
 ARM was originally designed to detect and measure this drift via a confidence signal — but that specific detector did not survive testing (below). The falsifiable signals ARM now relies on are behavioral: verdict-direction change and injection-propagation rate, not confidence magnitude.
 
-> **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **AUC ≈ 0.44 — below chance**. The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
+> **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **chance — within-Gemini AUC ≈ 0.50** (Gemini is the only provider that produced any contamination, so it is the only provider where the detector is even measurable; the pooled cross-provider AUC ≈ 0.38 is a confound, see below). The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
 
 ---
 
@@ -254,17 +254,20 @@ The **panel-composition findings** below are from the **matched mid/fast-tier pa
 
 This is a **negative result**, and it is the most important one for anyone relying on ARM's drift math. It comes from a separate, deliberately falsifiable experiment (`experiments/c1vc2/`): we plant a premise **we authored as false** into one agent's trace and measure whether downstream agents adopt it, under conclusion-only sharing (C1) vs. full-trace sharing (C2). Because we own the truth value of the plant, "did the lie spread?" is objectively scorable — no moral ground truth required.
 
-Scoring ARM's own confidence-drift signal as a *detector* of that contamination (`experiments/c1vc2/detector.js`, `src/lib/score.js`) yields a confusion matrix and ROC over 1,134 C2 subject-instances (33 contaminated / 1,101 clean):
+Scoring ARM's own confidence-drift signal as a *detector* of that contamination (`experiments/c1vc2/detector.js` re-scores the raw traces with the post-audit `src/lib/score.js`) yields a confusion matrix and ROC over 1,134 C2 subject-instances (**28 contaminated / 1,106 clean**):
 
 | Operating point | Precision | Recall | Notes |
 |---|---|---|---|
 | Confidence-drift flag (τ=0.1) | 0% | 0% | TP=0 — catches **zero** contaminated instances; 52 false alarms |
-| Verdict-flip flag (parameter-free) | 14% | 91% | Catches most, but 185 false positives |
-| **ROC AUC (confidence-drift score)** | — | — | **≈ 0.44 — below chance (0.5)** |
+| Verdict-flip flag (parameter-free) | **13%** | 100%* | *recall is **definitional** — see below; 187 false positives |
+| **Confidence-drift AUC, within-Gemini** | — | — | **≈ 0.50 — chance** |
+| Confidence-drift AUC, pooled | — | — | ≈ 0.38, but **provider-confounded** — see below |
 
-An AUC below 0.5 means the confidence-magnitude drift signal is **worse than a coin flip** at separating contaminated subjects from clean ones. This directly falsifies the intuition, stated at the top of this README, that magnitude drift is a usable contamination *detector*. What survives is the **behavioral** metric: whether a subject adopts the false premise (IPR), which does not depend on self-reported confidence at all.
+**Read the AUC per provider, not pooled.** All 28 contaminated instances are Gemini outputs — GPT and Claude adopted *zero* false premises, so the detector is undefined for them (you cannot score discrimination on a class with no members). Within Gemini, the only provider where the detector is measurable at all, confidence-drift separates contaminated from clean at **AUC ≈ 0.50 — exactly chance**. The pooled cross-provider AUC (≈ 0.38) looks "below chance" only because it compares Gemini's positives against a negative pool drawn from all three providers, so it partly measures provider identity rather than contamination. Either way the verdict is the same: confidence-magnitude drift is **not** a usable contamination detector, which falsifies the intuition stated at the top of this README. What survives is the **behavioral** metric: whether a subject adopts the false premise (IPR), which does not depend on self-reported confidence at all.
 
-**Caveats, stated up front:** the positive class is thin (33 contaminated instances), so treat AUC ≈ 0.44 as a directional falsification of the detector claim, not a locked point estimate. The experiment's own [`README`](experiments/c1vc2/README.md) still lists the missing pieces — power analysis, a permutation test on Δ(C2−C1), and pre-registration — before the *propagation* hypothesis (H1) itself is claimed as significant. Reproduce with `node experiments/c1vc2/detector.js`.
+**On the verdict-flip flag:** its ~100% recall is **not a finding** — contamination is *scored* as a verdict shift toward the pushed direction, and this flag detects verdict shifts, so high recall is true by construction. The informative number is its precision (~13%): 187 false positives on 1,106 clean instances. It is a cheap, high-recall tripwire, not a precise detector.
+
+**Caveats, stated up front:** the positive class is thin (28 contaminated instances, all Gemini), so treat the chance-level result as a directional falsification of the detector claim, not a locked point estimate. The experiment's own [`README`](experiments/c1vc2/README.md) still lists the missing pieces — power analysis, a permutation test on Δ(C2−C1) (now added in `stats.js`), and pre-registration — before the *propagation* hypothesis (H1) itself is claimed as significant. Reproduce with `node experiments/c1vc2/detector.js`.
 
 ### Provider composition determines the answer more than the question does
 
@@ -403,9 +406,13 @@ verdict) fires none of them.
 
 The C1-vs-C2 injection experiment (`experiments/c1vc2`) scored ARM's own
 confidence-drift signal as a contamination detector against ground truth and it
-came back **at chance (AUC ≈ 0.44)** — of 33 real false-premise adoptions, the
-magnitude flag caught **0** while the verdict-flip signal caught **30**. The
-confidence-delta machinery is therefore demoted from *detector* to *description*:
+came back **at chance (within-Gemini AUC ≈ 0.50**; Gemini is the only provider
+that produced contamination, so the only one where the detector is measurable —
+the pooled ≈ 0.38 is provider-confounded). Of the 28 real false-premise
+adoptions, the magnitude flag caught **0**; the verdict-flip signal caught all
+28, but that recall is definitional (contamination *is* a verdict shift) — its
+real cost is ~13% precision. The confidence-delta machinery is therefore demoted
+from *detector* to *description*:
 
 - **FAP isolation re-dispatch: disabled.** An Alpha/Beta R2 delta > +0.04 no
   longer re-dispatches the agent or writes a `memetic`/`epistemic` verdict — it is
@@ -531,7 +538,7 @@ The Fallback Audit Protocol now acts pre-reconciliation. When Alpha or Beta's R2
 
 Validated: an agent that flipped YES→NO under peer pressure reverted to YES in isolation — full claim reversal plus confidence drop, classified memetic.
 
-> **Superseded (post-v0.9):** the confidence-drift signal this circuit breaker rode on was later falsified as a contamination detector (`experiments/c1vc2`, AUC ≈ 0.44 — below chance). The isolation re-dispatch and its `memetic`/`epistemic` classification have been **disabled**; a +0.04 delta is now a logged breadcrumb only. The **polarity gate** (§1) is the primary detector. See the top of Version History.
+> **Superseded (post-v0.9):** the confidence-drift signal this circuit breaker rode on was later falsified as a contamination detector (`experiments/c1vc2`, chance-level — within-Gemini AUC ≈ 0.50). The isolation re-dispatch and its `memetic`/`epistemic` classification have been **disabled**; a +0.04 delta is now a logged breadcrumb only. The **polarity gate** (§1) is the primary detector. See the top of Version History.
 
 #### 3. Gamma Drift Forensic Flag
 `gamma_drift_exceeded` fires post-reconciliation when Gamma's `self_delta_vs_baseline` exceeds +0.04. Distinct from FAP (preventive, Alpha/Beta) — this is a forensic flag on the reconciler itself.
@@ -558,7 +565,7 @@ Previous versions used a symmetric ±0.05 memetic drift flag. v0.7.1 splits this
 
 Tightening (downward drift) is healthy; only upward drift is the threat. The threshold was tightened from 0.05 → 0.04 to be more sensitive.
 
-> **Superseded (post-v0.9):** the interpretive labels above ("epistemic tightening", "memetic drift") claimed an epistemic meaning the signal doesn't carry — the `experiments/c1vc2` detector run put confidence-drift discrimination at AUC ≈ 0.44. The thresholds now only bound **descriptive** direction/magnitude labels ("downward shift" / "minor shift" / "upward shift") and drive no action.
+> **Superseded (post-v0.9):** the interpretive labels above ("epistemic tightening", "memetic drift") claimed an epistemic meaning the signal doesn't carry — the `experiments/c1vc2` detector run put confidence-drift discrimination at chance (within-Gemini AUC ≈ 0.50). The thresholds now only bound **descriptive** direction/magnitude labels ("downward shift" / "minor shift" / "upward shift") and drive no action.
 
 #### 2. Rotating Silent Baseline
 
