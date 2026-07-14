@@ -452,7 +452,13 @@ reproducible via `node experiments/c1vc2/rescore.mjs`.
   terms and fallacy-name phrases with distinctive verbatim trace phrases so the
   scorer fix above has clean markers to work with. Injected payloads unchanged.
 - **`stats.js`** now reports a measurable-only IPR/Δ/CI/permutation block
-  alongside the raw one.
+  alongside the raw one, and (since the pipeline-hygiene pass) **re-scores the
+  raw traces with the current scorer by default** — the same policy as
+  `detector.js` — instead of trusting `adopted` labels frozen at collection time
+  (`--stored-labels` reproduces older tables). `run.js` likewise headlines the
+  measurable (eligible-masked, instance-pooled) IPR/Δ and splits adoption by
+  mechanism with separate denominators (explicit over all instances, implicit
+  over eligible ones).
 
 Separately, a full pass over `src/` fixed several implementation issues surfaced
 during review:
