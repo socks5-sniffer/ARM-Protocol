@@ -32,11 +32,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true
+      # Enforcing gate: high/critical advisories fail the build. Moderate is left
+      # to the advisory JSON report below so a transitive moderate finding does not
+      # block unrelated PRs, but a high/critical vuln stops the merge.
+      - name: Run npm audit (high/critical — enforcing)
+        run: npm audit --audit-level=high
 
-      - name: Run npm audit with JSON output
+      # if: always() so the artifact exists even when the enforcing gate above
+      # correctly fails — that's exactly when the report is most needed.
+      - name: Run npm audit with JSON output (advisory report)
+        if: always()
         run: npm audit --json > npm-audit-report.json
         continue-on-error: true
 
@@ -136,11 +141,15 @@ jobs:
           ];
           EOF
 
-      - name: Run ESLint security scan
-        run: npx eslint --config eslint.config.security.mjs src/ --format json --output-file eslint-security-report.json || true
+      # Report generation stays advisory (artifact only). The gating scan below has
+      # no "|| true", so any error-level rule (eval / implied-eval / unsafe-regex /
+      # no-unsanitized, etc.) fails the build. server.js is included because it is
+      # the key-injecting provider proxy — the most security-sensitive file here.
+      - name: Run ESLint security scan (advisory JSON report)
+        run: npx eslint --config eslint.config.security.mjs src/ server.js --format json --output-file eslint-security-report.json || true
 
-      - name: Display ESLint results
-        run: npx eslint --config eslint.config.security.mjs src/ || true
+      - name: Display ESLint results (enforcing — error-level rules fail the build)
+        run: npx eslint --config eslint.config.security.mjs src/ server.js
 
       - name: Upload ESLint security report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -189,7 +198,45 @@ jobs:
             exit 1
           fi
 
-          echo "Vite config validation completed successfully."
+          # Dev proxy must not be wide-open by default: the hardcoded
+          # `allowedHosts: "all"` (DNS-rebinding enabler against the key-injecting
+          # proxy) must be gone, replaced by the env-driven allowlist.
+          if grep -Eq 'allowedHosts:\s*"all"' vite.config.js; then
+            echo "✗ vite.config.js still hardcodes allowedHosts: \"all\""
+            exit 1
+          else
+            echo "✓ allowedHosts is not hardcoded to \"all\""
+          fi
+
+          if grep -q 'devProxyAuth' vite.config.js; then
+            echo "✓ dev proxy auth guard present"
+          else
+            echo "✗ Missing dev proxy auth guard (devProxyAuth)"
+            exit 1
+          fi
+
+          echo "Checking server.js provider proxy hardening..."
+
+          # Broken-access-control protection: every keyed provider route must
+          # validate the request model against a per-provider allowlist.
+          for token in requireAllowedModel ALLOWED_ANTHROPIC_MODELS ALLOWED_OPENAI_MODELS ALLOWED_OPENAI_EMBEDDING_MODELS ALLOWED_GEMINI_MODELS; do
+            if grep -q "$token" server.js; then
+              echo "✓ server.js: $token present"
+            else
+              echo "✗ server.js: missing $token"
+              exit 1
+            fi
+          done
+
+          # The /api/* proxy must fail closed when no access token is configured.
+          if grep -q 'requireProxyAuth' server.js; then
+            echo "✓ server.js: /api proxy auth gate present"
+          else
+            echo "✗ server.js: missing requireProxyAuth gate"
+            exit 1
+          fi
+
+          echo "Proxy/config security validation completed successfully."
 
   secrets-scan:
     name: "Secrets Detection"

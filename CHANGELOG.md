@@ -9,6 +9,37 @@ trace-schema changes.
 
 ## [Unreleased]
 
+### Security
+- **Untrusted-input envelope markers can no longer be forged.** `sanitizeText`
+  now strips any literal `[BEGIN/END UNTRUSTED INPUT …]` marker from untrusted
+  text (question + peer traces). Previously a payload containing the exact
+  `[END UNTRUSTED INPUT]` string could fake the close of its own envelope, so the
+  text after it read as trusted instructions to the model. Stripped after the
+  zero-width/bidi pass so obfuscated variants are caught too.
+- **Provider proxy routes now enforce a per-model allowlist.** `server.js`
+  validates each request body's `model` against a per-provider allowlist on the
+  Anthropic, OpenAI chat, and OpenAI embeddings routes — closing the
+  denial-of-wallet gap where a caller holding the shared token could spend the
+  operator's key on an arbitrarily expensive model. This matches the path/model
+  pinning the Gemini route already had. Defaults track `src/config.js`; override
+  via `ARM_ALLOWED_ANTHROPIC_MODELS` / `ARM_ALLOWED_OPENAI_MODELS` /
+  `ARM_ALLOWED_OPENAI_EMBEDDING_MODELS`. Non-POST requests to keyed routes now
+  return `405`.
+- **Vite dev proxy can be authenticated and is no longer wide-open by default.**
+  The dev proxy injects the operator's provider keys into `/api/*` requests; a new
+  `devProxyAuth` guard requires `ARM_DEV_PROXY_TOKEN` (when set) as `x-arm-token`
+  before proxying, running *before* the proxy so rejected requests never reach a
+  provider with a key attached. `allowedHosts: "all"` (which disabled the host
+  check that prevents DNS-rebinding against the proxy) is no longer hardcoded —
+  it defaults to Vite's safe behavior and is opened only via `VITE_ALLOWED_HOSTS`.
+- **Security CI now gates instead of only advising.** `npm audit` fails the build
+  on high/critical advisories (moderate stays an advisory report); the ESLint
+  security scan dropped its `|| true` so error-level rules (eval, unsafe-regex,
+  no-unsanitized, …) fail the build, and the scan now also covers `server.js` (the
+  key-injecting proxy). The config-validation job additionally asserts the proxy
+  allowlists, the `/api` auth gate, and the dev-proxy hardening are present, so a
+  future edit cannot silently remove them.
+
 ### Changed
 - **Polarity gate now resolves its baseline against a Gamma R1 *consensus*.** The
   gate previously compared Gamma R2 against the visible R1 draw (`pG1`) alone —
