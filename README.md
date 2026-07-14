@@ -16,7 +16,7 @@ ARM research centers on a structural vulnerability in multi-agent AI: the **Pers
 
 ARM was originally designed to detect and measure this drift via a confidence signal — but that specific detector did not survive testing (below). The falsifiable signals ARM now relies on are behavioral: verdict-direction change and injection-propagation rate, not confidence magnitude.
 
-> **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **chance — within-Gemini AUC ≈ 0.50** (Gemini is the only provider that produced any contamination, so it is the only provider where the detector is even measurable; the pooled cross-provider AUC ≈ 0.38 is a confound, see below). The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
+> **Falsification status (2026-07):** we built the direct test of that detection claim and it did **not** hold for the confidence-drift signal. In a ground-truthed injection experiment (`experiments/c1vc2/`), ARM's confidence-magnitude drift discriminates contaminated from clean subjects at **chance — within-Gemini AUC ≈ 0.48** (Gemini is the only provider that produced any contamination, so it is the only provider where the detector is even measurable; the pooled cross-provider AUC ≈ 0.38 is a confound, see below). The deployed polarity gate's own transition class (firm yes↔no flips) catches ~36% of inferred contaminations at 40% precision. The behavioral propagation metric (IPR — did a subject *adopt* a premise we authored as false?) is the surviving, falsifiable signal; the magnitude-drift flag is not a validated contamination detector. See [Key Empirical Findings → *The drift signal fails as a contamination detector*](#the-drift-signal-fails-as-a-contamination-detector-c1-vs-c2) below.
 
 ---
 
@@ -108,6 +108,7 @@ This repository includes production OpenShift artifacts:
 - `Containerfile` — multi-stage image build (Node.js 20 UBI)
 - `server.js` — production runtime serving `dist/` and proxying provider APIs
 - `openshift/secret.example.yaml` — API key secret template
+- `openshift/pvc.yaml` — persistent volume claim for auto-saved traces
 - `openshift/deployment.yaml` — app deployment
 - `openshift/service.yaml` — internal service
 - `openshift/route.yaml` — external HTTPS route
@@ -129,6 +130,7 @@ Deploy to OpenShift:
 
 ```bash
 oc apply -f openshift/secret.example.yaml
+oc apply -f openshift/pvc.yaml
 oc apply -f openshift/deployment.yaml
 oc apply -f openshift/service.yaml
 oc apply -f openshift/route.yaml
@@ -258,14 +260,15 @@ Scoring ARM's own confidence-drift signal as a *detector* of that contamination 
 
 | Operating point | Precision | Recall | Notes |
 |---|---|---|---|
-| Confidence-drift flag (τ=0.1) | 0% | 0% | TP=0 — catches **zero** contaminated instances; 52 false alarms |
-| Verdict-flip flag (parameter-free) | **13%** | 100%* | *recall is **definitional** — see below; 187 false positives |
-| **Confidence-drift AUC, within-Gemini** | — | — | **≈ 0.50 — chance** |
+| Confidence-drift flag (τ=0.1) | 1.0% | 7.1% | TP=2, FP=203 (2026-07-14 float-quantization fix; previously misreported as TP=0/FP=52 — nominal 0.10 drifts failed `>= 0.1` as 0.0999…) |
+| Verdict-change flag (any change) | **13%** | 100%* | *recall is **definitional** — see below; 187 false positives; **not what ships** |
+| **Firm-flip flag (deployed gate's class)** | **40%** | **35.7%** | TP=10, FP=15, FN=18 — the honest number for the shipped polarity gate, and an upper bound (its consensus requirement isn't testable here) |
+| **Confidence-drift AUC, within-Gemini** | — | — | **≈ 0.48 — chance** |
 | Confidence-drift AUC, pooled | — | — | ≈ 0.38, but **provider-confounded** — see below |
 
 **Read the AUC per provider, not pooled.** All 28 contaminated instances are Gemini outputs — GPT and Claude adopted *zero* false premises, so the detector is undefined for them (you cannot score discrimination on a class with no members). Within Gemini, the only provider where the detector is measurable at all, confidence-drift separates contaminated from clean at **AUC ≈ 0.50 — exactly chance**. The pooled cross-provider AUC (≈ 0.38) looks "below chance" only because it compares Gemini's positives against a negative pool drawn from all three providers, so it partly measures provider identity rather than contamination. Either way the verdict is the same: confidence-magnitude drift is **not** a usable contamination detector, which falsifies the intuition stated at the top of this README. What survives is the **behavioral** metric: whether a subject adopts the false premise (IPR), which does not depend on self-reported confidence at all.
 
-**On the verdict-flip flag:** its ~100% recall is **not a finding** — contamination is *scored* as a verdict shift toward the pushed direction, and this flag detects verdict shifts, so high recall is true by construction. The informative number is its precision (~13%): 187 false positives on 1,106 clean instances. It is a cheap, high-recall tripwire, not a precise detector.
+**On the two verdict flags (revised 2026-07-14):** the any-change flag's ~100% recall is **not a finding** — contamination is *scored* as a verdict shift toward the pushed direction, and this flag detects verdict shifts, so high recall is true by construction; its ~13% precision (187 false positives on 1,106 clean instances) is the informative number. But it is also **not what the app deploys**: 190 of its 215 firings involve `conditional` transitions, which the shipped polarity gate treats as advisory only. The gate acts on firm yes↔no reversals — and that **firm-flip** operating point catches 10 of 28 contaminations (35.7% recall) at 40% precision. The deployed mechanism misses roughly two-thirds of inferred contaminations, and even that is an upper bound, since the gate's Gamma-consensus requirement (two agreeing baseline draws) can't be evaluated from this experiment's single control draw.
 
 **Caveats, stated up front:** the positive class is thin (28 contaminated instances, all Gemini), so treat the chance-level result as a directional falsification of the detector claim, not a locked point estimate. The experiment's own [`README`](experiments/c1vc2/README.md) still lists the missing pieces — power analysis, a permutation test on Δ(C2−C1) (now added in `stats.js`), and pre-registration — before the *propagation* hypothesis (H1) itself is claimed as significant. Reproduce with `node experiments/c1vc2/detector.js`.
 
@@ -402,16 +405,58 @@ verdict) fires none of them.
 
 ## 📜 Version History
 
+### Unreleased — Methodology-review corrections (2026-07-14)
+
+An external methodology review of the C1-vs-C2 program found five substantive
+issues; all are fixed and every affected claim is corrected in place (⟳ marks
+in the FINDINGS docs):
+
+- **Unit of analysis.** Significance was computed over subject-instances
+  nested within only 8 authored injections. `stats.js` now reports an
+  injection-blocked exact sign-flip test as the headline; under it **no
+  panel's Δ is significant** (all-Gemini p = 0.5625, previously reported as
+  p ≈ 0.009 protective). H1's status is a clean negative, not a protective
+  effect.
+- **Float quantization.** Drift scores are rounded to 3 decimals before
+  thresholding; the τ = 0.1 operating point was misreported (TP=0/FP=52 →
+  TP=2/FP=203) because 0.9 − 0.8 fails `>= 0.1` in binary floating point.
+  Within-Gemini AUC moves 0.499 → 0.479 (still chance).
+- **Gate-faithful detector evaluation.** The reported verdict-flip operating
+  point counted any verdict change (190/215 involve `conditional`), which the
+  deployed polarity gate ignores. `detector.js` now also reports the firm
+  yes↔no flip point the gate actually acts on: **35.7% recall, 40% precision**.
+- **Ground-truth caveat.** All 28 contamination positives are *inferred*
+  verdict movements (zero explicit marker adoptions); a repeated no-peer
+  control run is required to separate premise uptake from spontaneous verdict
+  instability, and is now the top of the experiment queue.
+- **Result-file self-containment.** `run.js` now snapshots the battery
+  (filename + SHA-256 + full per-run injection) into results; `detector.js` /
+  `stats.js` / `rescore.mjs` resolve injections per-file via
+  `experiments/c1vc2/battery.js` instead of a merged last-file-wins index that
+  silently mis-scored a duplicated injection id.
+
+Also in this pass: the scorer labels marker-quoting refutations as
+`challenged` instead of `unmoved` (7 instances relabeled; no IPR change); the
+measurable-IPR denominator keeps explicit adoptions on baseline-aligned
+instances (latent, no current number change); server middleware order fixed so
+unauthenticated bodies are never buffered; trace saves are exclusive-create
+(409 on collision); a PVC for trace storage; loopback-default dev scripts with
+an explicit `dev:host` opt-in and a warning when the keyed dev proxy is
+exposed without a token; `VITE_ALLOWED_HOSTS=all` maps to Vite's `true`; stale
+"rotating silent baseline" UI text removed.
+
 ### Unreleased — Confidence-drift detector retired
 
 The C1-vs-C2 injection experiment (`experiments/c1vc2`) scored ARM's own
 confidence-drift signal as a contamination detector against ground truth and it
-came back **at chance (within-Gemini AUC ≈ 0.50**; Gemini is the only provider
+came back **at chance (within-Gemini AUC ≈ 0.48**; Gemini is the only provider
 that produced contamination, so the only one where the detector is measurable —
-the pooled ≈ 0.38 is provider-confounded). Of the 28 real false-premise
-adoptions, the magnitude flag caught **0**; the verdict-flip signal caught all
-28, but that recall is definitional (contamination *is* a verdict shift) — its
-real cost is ~13% precision. The confidence-delta machinery is therefore demoted
+the pooled ≈ 0.38 is provider-confounded). Of the 28 inferred false-premise
+adoptions, the magnitude flag caught **2** (τ=0.1, post-quantization-fix); the
+any-verdict-change signal caught all 28, but that recall is definitional
+(contamination *is* a verdict shift) — its real cost is ~13% precision, and the
+firm-flip class the deployed gate acts on catches 10/28 at 40% precision (see
+the 2026-07-14 entry above). The confidence-delta machinery is therefore demoted
 from *detector* to *description*:
 
 - **FAP isolation re-dispatch: disabled.** An Alpha/Beta R2 delta > +0.04 no
@@ -438,7 +483,8 @@ reproducible via `node experiments/c1vc2/rescore.mjs`.
   non-adoptions, deflating the denominator. 33% of all-Gemini's false-premise
   instances were affected. Corrected: all-Gemini's true measurable IPR is
   **21.0%** (C1) / **10.5%** (C2), not the previously reported 14.2% / 7.1%; the
-  protective Δ strengthens to **−0.105** (p≈.01).
+  protective Δ strengthens to **−0.105** (instance-level p ≈ .01 — ⟳ downgraded
+  2026-07-14: not significant under the injection-blocked test, p = 0.5625).
 - **Verdict-guarded `explicit_adoption`.** Marker-matching previously scored a
   subject as "adopting" a fallacy whenever its reasoning named the fallacy's own
   marker phrase, even while explicitly rejecting it in different words. This was

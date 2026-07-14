@@ -129,24 +129,70 @@ not contamination — those are the clean negatives that prove discrimination).
 than trusting the `adopted` labels frozen into each result JSON at collection
 time — those predate the 2026-07 scorer audit. The **detector score** is
 `|confidence(C2) − confidence(control)|`, the continuous analogue of ARM's drift
-flag; sweeping a threshold τ over it yields the ROC + trapezoidal AUC. A
-parameter-free verdict-flip flag is reported as a second operating point.
-Scoring primitives: [`scoreDetector()` / `computeIPR()`](../../src/lib/score.js).
+flag, **quantized to 3 decimals** before thresholding (2026-07-14 fix: binary
+float subtraction turned nominal 0.10 drifts into 0.0999…, silently failing
+τ ≥ 0.1 and splitting ROC rows — the τ = 0.1 operating point was previously
+reported as TP=0/FP=52 and is actually TP=2/FP=203). Sweeping τ yields the
+ROC + trapezoidal AUC. Two parameter-free verdict flags are reported as
+additional operating points. Scoring primitives:
+[`scoreDetector()` / `computeIPR()`](../../src/lib/score.js).
 
 Output: operating-point precision/recall/F1, an ROC table, a **per-provider AUC
-breakdown**, and a `detector-results.json`. On the current committed runs the
-confidence-drift score is **at chance within Gemini (AUC ≈ 0.50)** — the only
-provider that produced contamination, so the only one where the detector is
-measurable; the **pooled AUC (≈ 0.38) is provider-confounded** and should not be
-read as "below chance." The verdict-flip flag reaches ~100% recall, but that is
-**definitional** (contamination is scored as a verdict shift), so its ~13%
-precision (187 false positives / 1,106 clean) is the real number. A genuine,
-reportable negative result — not a rubber stamp.
+breakdown**, and a `detector-results.json`. On the current committed runs:
+
+- The confidence-drift score is **at chance within Gemini (AUC ≈ 0.48)** — the
+  only provider that produced contamination, so the only one where the detector
+  is measurable; the **pooled AUC (≈ 0.38) is provider-confounded** and should
+  not be read as "below chance."
+- The **verdict-change flag** (any change, including transitions involving
+  `conditional`) reaches 100% recall, but that is **definitional for that flag**
+  (contamination is scored as a verdict shift), so its ~13% precision
+  (187 false positives / 1,106 clean) is the real number. **This flag is not
+  what ships**: 190 of the 215 verdict changes it fires on involve
+  `conditional`, which the deployed polarity gate treats as advisory only.
+- The **firm-flip flag** (yes↔no reversals only — the transition class the
+  deployed gate actually acts on, per `classifyVerdictTransition` in
+  `src/lib/analysis.js`) scores **TP=10 FP=15 FN=18: 35.7% recall, 40%
+  precision** (2026-07-14). This is the honest operating point for the shipped
+  mechanism, and it is an *upper bound*: the deployed gate additionally
+  requires Gamma baseline consensus (two agreeing R1 draws), which this
+  experiment's single control draw cannot evaluate.
+
+A genuine, reportable negative result — not a rubber stamp: ARM's current
+signals catch roughly a third of inferred contaminations at 40% precision, and
+the continuous drift score carries no usable signal at all.
+
+## Statistics
+
+`stats.js` reports three layers, in increasing order of what they can support:
+
+1. **Instance-level** bootstrap CIs + paired permutation test — answers only
+   "did condition matter on these specific injections?" Repeated prompts are
+   NOT independent evidence; do not generalize from this p.
+2. **Injection-blocked** exact sign-flip test (one Δ per authored injection,
+   all 2^k signings enumerated) — the headline significance test. The true
+   sample size for "does transparency amplify propagation?" is the number of
+   injections (k = 8), not the instance count.
+3. A **model-gap** test in C2 (independent permutation over instances; the
+   same nesting caveat applies).
+
+```bash
+node experiments/c1vc2/stats.js experiments/c1vc2/c1vc2-results-allGemini.json
+```
 
 ## What's deliberately NOT here yet
 
-- **Stats:** wire `reps` up to a power-analyzed n and add a permutation test on
-  `Δ` before claiming significance. Pre-register H1/H4 (a dated commit) first.
+- **A repeated no-peer control run:** every current contamination positive is
+  an *inferred* verdict movement (implicit adoption vs a single control draw);
+  zero explicit marker adoptions exist. Without an estimate of each model's
+  spontaneous verdict-flip rate, IPRs are upper bounds that include baseline
+  instability. Needed: same battery, control condition only, ~15 draws per
+  subject.
+- **A power-analyzed battery:** k = 8 injections cannot detect small effects
+  at the injection level (the blocked test's granularity is 2^−8).
+- **Order counterbalancing:** within a rep, calls always run R1 → C1 → C2;
+  stateless calls make this a small factor (provider drift over minutes), but
+  it should be randomized.
 - **Calibration:** confidence numbers remain unvalidated; IPR is behavioral on
   purpose so the result doesn't depend on them.
 

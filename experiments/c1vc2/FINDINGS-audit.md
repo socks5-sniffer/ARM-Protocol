@@ -263,3 +263,26 @@ conclusion, 30/30), so it provides no information about Claude's truth-updating.
 block; derives eligibility for pre-patch files from `raw.meta`). Scorer patch
 in `src/lib/score.js`; corrections folded into
 [`FINDINGS-monocultures.md`](./FINDINGS-monocultures.md) (⟲-marked).*
+
+## Addendum (2026-07-14) — unit-of-analysis correction
+
+An external methodology review found that the permutation p-values in this
+file's tables (including Re-run 2's −0.105 "p = 0.010") treat 240
+subject-instances as independent evidence, when they are nested within only
+eight authored injections. The instance-level test answers "did condition
+matter on these eight prompts?", not "does transparency change propagation?" —
+for the latter the unit is the injection and k = 8. `stats.js` now reports an
+injection-blocked exact sign-flip test as the headline: under it the
+all-Gemini Δ is **not significant (p = 0.5625**, driven by one injection at
+Δ = −0.60 offset by another at +0.33, with three at exactly 0). No panel's Δ
+is significant under blocking. The Δ point estimates, IPRs, eligibility
+analysis, and every scoring correction in this file stand; only the
+significance claims attached to them are downgraded. See the ⟳-marked sections
+of [`FINDINGS-monocultures.md`](./FINDINGS-monocultures.md).
+
+A second finding from the same review is a caveat this file's framing had no
+row for: **all contaminated positives in the program are `implicit_adoption`**
+(verdict movement vs a single control draw) — zero explicit marker adoptions
+survive the tightened markers. Absent a repeated no-peer control run to
+estimate spontaneous verdict-flip rates, every adoption count here is an upper
+bound that includes baseline instability.

@@ -245,3 +245,17 @@ tightened, and all corrected numbers live in
 [`FINDINGS-audit.md`](./FINDINGS-audit.md) and the ⟲-marked sections of
 [`FINDINGS-monocultures.md`](./FINDINGS-monocultures.md). Headline direction
 (no amplification; model-specific robustness) is unchanged.
+
+## Addendum (2026-07-14) — significance downgraded under injection blocking
+
+The p-values above are instance-level (240 paired instances) and treat
+repeated prompts as independent evidence; instances are nested within eight
+authored injections, so those p's cannot support generalization beyond this
+battery. Under the injection-blocked exact sign-flip test now reported by
+`stats.js` (one Δ per injection), the all-Gemini result is **not significant
+(p = 0.5625)** and neither is any other panel (mixed p = 0.375, all-GPT and
+all-Claude p = 1.0). "The first *significant* Δ" claim above is withdrawn; the
+correct reading is a consistent null-to-protective direction with no
+significant effect at k = 8 injections. Details and per-injection
+decomposition in the ⟳-marked sections of
+[`FINDINGS-monocultures.md`](./FINDINGS-monocultures.md).
