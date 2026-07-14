@@ -15,7 +15,23 @@ function devProxyAuth(token) {
   return {
     name: "arm-dev-proxy-auth",
     configureServer(server) {
-      if (!token) return;
+      if (!token) {
+        // Loopback binding is the safe default (`npm run dev`); a non-loopback
+        // bind (`npm run dev:host` / --host) with no token exposes the keyed
+        // proxy to every LAN client — Vite's host check never applies to
+        // IP-address Hosts, so allowedHosts cannot mitigate this. Warn loudly.
+        const host = server.config.server.host;
+        const exposed = host === true || (typeof host === "string" && !["localhost", "127.0.0.1", "::1"].includes(host));
+        if (exposed) {
+          console.warn(
+            "\n[ARM] WARNING: dev server is bound to a non-loopback interface with no " +
+              "ARM_DEV_PROXY_TOKEN set. Any client that can reach this machine can spend " +
+              "the configured provider API keys through the /api/* dev proxy. Set " +
+              "ARM_DEV_PROXY_TOKEN, or use `npm run dev` (loopback) instead.\n"
+          );
+        }
+        return;
+      }
       server.middlewares.use((req, res, next) => {
         if (!req.url || !req.url.startsWith("/api/")) return next();
         // Node can surface repeated headers as string[]; normalize to the first
@@ -44,17 +60,20 @@ export default defineConfig(({ mode }) => {
   const openaiKey    = env.OPENAI_API_KEY    || env.VITE_OPENAI_API_KEY;
   const devProxyToken = env.ARM_DEV_PROXY_TOKEN || "";
 
-  // Host allowlist for the dev server. "all" disables Vite's host check entirely,
-  // which is what enables DNS-rebinding against the key-injecting proxy — so it is
-  // no longer the default. Default: Vite's own safe behavior (loopback + a single
-  // configured host). Dev Spaces (dynamic hostnames) sets VITE_ALLOWED_HOSTS to a
-  // comma-separated list, or the literal "all" to opt back into the old wide-open
-  // behavior. Pair "all" with ARM_DEV_PROXY_TOKEN so the proxy is still gated.
+  // Host allowlist for the dev server. VITE_ALLOWED_HOSTS=all disables Vite's
+  // host check entirely, which is what enables DNS-rebinding against the
+  // key-injecting proxy — so it is no longer the default. Default: Vite's own
+  // safe behavior (loopback + a single configured host). Dev Spaces (dynamic
+  // hostnames) sets VITE_ALLOWED_HOSTS to a comma-separated list, or the
+  // literal "all" to opt back into the old wide-open behavior. Pair "all" with
+  // ARM_DEV_PROXY_TOKEN so the proxy is still gated. Vite's API takes
+  // `string[] | true` — "all" maps to `true` (the string "all" is not a valid
+  // value and would be treated as a literal hostname).
   const allowedHostsEnv = (env.VITE_ALLOWED_HOSTS || "").trim();
   const allowedHostsList = allowedHostsEnv.split(",").map((h) => h.trim()).filter(Boolean);
   const allowedHosts =
     allowedHostsEnv.toLowerCase() === "all"
-      ? "all"
+      ? true
       : allowedHostsList.length
         ? allowedHostsList
         : undefined; // unset, or a degenerate value like "," → Vite default

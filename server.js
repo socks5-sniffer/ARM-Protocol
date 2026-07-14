@@ -254,13 +254,17 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Only buffer raw request bodies for the provider proxy. Buffering every request
-// (incl. SPA-fallback GETs) at 10mb is needless memory pressure under load.
-app.use("/api", express.raw({ type: "*/*", limit: "10mb" }));
+// Order matters: rate limit and authentication are header-only checks, so they
+// run BEFORE the body parser. Buffering first meant any unauthenticated caller
+// could force repeated 10 MB allocations without knowing the token — rejected
+// requests now never have their bodies buffered.
 app.use(enforceRateLimit);
 // Authenticate every keyed provider call. Mounted before the provider routes so
 // it covers /api/anthropic, /api/openai and /api/gemini uniformly.
 app.use("/api", requireProxyAuth);
+// Only buffer raw request bodies for the provider proxy. Buffering every request
+// (incl. SPA-fallback GETs) at 10mb is needless memory pressure under load.
+app.use("/api", express.raw({ type: "*/*", limit: "10mb" }));
 
 app.use("/api/anthropic", async (req, res) => {
   // Method/model gate first: an invalid method or model gets its 405/400 even
@@ -391,7 +395,7 @@ app.use("/api/gemini", async (req, res) => {
 const traceDir = path.join(__dirname, "trace");
 if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
 
-app.post("/api/save-trace", enforceRateLimit, (req, res) => {
+app.post("/api/save-trace", (req, res) => {
   const key = req.headers["x-arm-token"];
   if (ACCESS_TOKEN && key !== ACCESS_TOKEN) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -421,10 +425,17 @@ app.post("/api/save-trace", enforceRateLimit, (req, res) => {
 
   const dest = path.join(traceDir, safe);
   try {
-    fs.writeFileSync(dest, JSON.stringify(trace, null, 2), "utf8");
+    // Exclusive create ("wx"): auto-saved filenames are timestamped and unique,
+    // so a collision means a replay or a name clash — refuse rather than let a
+    // shared-token holder silently overwrite an existing research trace.
+    fs.writeFileSync(dest, JSON.stringify(trace, null, 2), { encoding: "utf8", flag: "wx" });
     console.log(`[ARM] trace saved → trace/${safe}`);
     res.json({ ok: true, saved: `trace/${safe}` });
   } catch (err) {
+    if (err.code === "EEXIST") {
+      console.warn(`[ARM] trace save refused (exists): trace/${safe}`);
+      return res.status(409).json({ error: "A trace with this filename already exists." });
+    }
     console.error(`[ARM] trace save failed: ${err.message}`);
     res.status(500).json({ error: "Failed to write trace file" });
   }
@@ -433,7 +444,7 @@ app.post("/api/save-trace", enforceRateLimit, (req, res) => {
 app.use(express.static(distDir));
 // SPA fallback. Express 5 (path-to-regexp v8) rejects a bare "*"; use a named
 // wildcard so any unmatched GET returns index.html for client-side routing.
-app.get("/*splat", enforceRateLimit, (_req, res) => {
+app.get("/*splat", (_req, res) => {
   if (!indexHtml) {
     res.status(503).send("Build output unavailable.");
     return;
