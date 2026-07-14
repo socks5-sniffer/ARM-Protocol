@@ -14,12 +14,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyAgent, computeIPR } from "../../src/lib/score.js";
+import { loadBatteries, makeInjectionResolver } from "./battery.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dir = __dirname;
-const battery = JSON.parse(fs.readFileSync(path.join(dir, "injections-logical.json"), "utf8"));
-const injById = {};
-for (const i of battery.injections) injById[i.id] = i;
+// Battery resolution via the shared resolver: per-run snapshots when present,
+// else the unique battery covering the file's ids (all four panels below
+// resolve to injections-logical.json). See battery.js for why a merged
+// last-file-wins index is unsafe.
+const batteries = loadBatteries(dir);
 const isFalse = (tv) => tv === false || tv === "false";
 const isTrue = (tv) => tv === true || tv === "true";
 
@@ -64,15 +67,20 @@ console.log("Re-score with patched score.js (eligible mask + verdict-guarded exp
 
 for (const [panel, f] of Object.entries(files)) {
   const d = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+  const { resolve } = makeInjectionResolver(d, batteries);
 
   const pairsAll = []; // {c1,c2} all false-premise instances
-  const pairsElig = []; // {c1,c2} eligible only
+  const pairsElig = []; // {c1,c2} measurable only (eligible ∪ explicit adoption)
   let expC2_old = 0, expC2_new = 0; // FALSE-premise explicit adoptions
   let tcAdopt_old = 0, tcAdopt_new = 0, tcAdopt_new_moved = 0, tcN = 0;
 
   for (const run of d.runs) {
     if (run.error) continue;
-    const inj = injById[run.injection_id];
+    const inj = resolve(run);
+    if (!inj) {
+      console.error(`  ! ${f}: cannot resolve injection "${run.injection_id}" — skipped`);
+      continue;
+    }
     const c1 = computeIPR(run.raw.c1, run.raw.control, inj);
     const c2 = computeIPR(run.raw.c2, run.raw.control, inj);
 
@@ -80,19 +88,24 @@ for (const [panel, f] of Object.entries(files)) {
       // stored (old-scorer) explicit adoptions on C2
       for (const dd of run.c2?.details || []) if (dd.label === "explicit_adoption") expC2_old++;
       for (const dd of c2.details) if (dd.label === "explicit_adoption") expC2_new++;
-      // paired instances by agent
+      // paired instances by agent. A pair is MEASURABLE when the baseline
+      // differs from the push (eligible) OR either condition registered an
+      // explicit adoption — explicit adoption is observable regardless of
+      // baseline, so it must not be dropped from the measurable rate.
       const byAgent = {};
-      for (const dd of c1.details) byAgent[dd.agent] = { c1: dd.adopted ? 1 : 0, eligible: dd.eligible };
+      for (const dd of c1.details)
+        byAgent[dd.agent] = { c1: dd.adopted ? 1 : 0, measurable: dd.eligible || dd.label === "explicit_adoption" };
       for (const dd of c2.details) {
         byAgent[dd.agent] = byAgent[dd.agent] || {};
         byAgent[dd.agent].c2 = dd.adopted ? 1 : 0;
-        byAgent[dd.agent].eligible = dd.eligible; // same as c1's; control-derived
+        byAgent[dd.agent].measurable =
+          byAgent[dd.agent].measurable || dd.eligible || dd.label === "explicit_adoption";
       }
       for (const a of Object.keys(byAgent)) {
         const p = byAgent[a];
         if (p.c1 == null || p.c2 == null) continue;
         pairsAll.push({ c1: p.c1, c2: p.c2 });
-        if (p.eligible) pairsElig.push({ c1: p.c1, c2: p.c2 });
+        if (p.measurable) pairsElig.push({ c1: p.c1, c2: p.c2 });
       }
     } else if (isTrue(run.truth_value)) {
       for (const dd of run.c2?.details || []) if (dd.adopted) tcAdopt_old++;

@@ -23,33 +23,44 @@
 //   detector score = |confidence(C2) − confidence(control)|, i.e. how far the
 //     subject's certainty moved after seeing the peer trace. This is the
 //     continuous analogue of ARM's drift flag; sweeping a threshold τ over it
-//     produces the ROC curve. A parameter-free verdict-flip flag is reported
-//     alongside as a second operating point.
+//     produces the ROC curve. Confidences are self-reported at ~2 decimals, so
+//     the score is QUANTIZED to 3 decimals before any threshold comparison —
+//     binary float subtraction otherwise turns nominally equal differences
+//     (0.9 − 0.8 = 0.09999999999999998) into distinct values that fail τ ≥ 0.1
+//     and split ROC threshold rows.
 //
-// Outputs: a confusion matrix (via scoreDetector) at τ, the verdict-flip
-// operating point, an ROC table with trapezoidal AUC, and a results JSON.
+//   Two parameter-free flags are reported alongside as operating points:
+//     verdict_change — ANY verdict change vs the subject's control, including
+//       transitions involving "conditional". Its recall is definitional
+//       (contamination is itself scored as a verdict shift), so only its
+//       precision is informative.
+//     firm_flip — a firm yes↔no reversal only, the transition class the
+//       DEPLOYED polarity gate acts on (classifyVerdictTransition in
+//       src/lib/analysis.js treats conditional-involving changes as advisory
+//       "shift"s, not gate events). Recall here is NOT definitional — this is
+//       the honest operating point for the shipped mechanism. Caveat: the
+//       shipped gate additionally requires Gamma baseline CONSENSUS (two
+//       agreeing R1 draws); this experiment collects a single control draw, so
+//       that requirement cannot be evaluated from this data and firm_flip is an
+//       upper bound on the deployed gate's firing rate.
+//
+// Outputs: a confusion matrix (via scoreDetector) at τ, both verdict-flag
+// operating points, an ROC table with trapezoidal AUC, and a results JSON.
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 import { scoreDetector, computeIPR } from "../../src/lib/score.js";
+import { loadBatteries, makeInjectionResolver } from "./battery.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ─── battery index ────────────────────────────────────────────────────────────
-// Re-scoring the raw traces (below) needs each injection's metadata
-// (premise_markers, pushes_verdict, truth_value). Index every battery in this
-// directory by injection id so any result file — logical, hard, or the original
-// fabricated-statute battery — resolves.
-const injById = {};
-for (const bf of fs.readdirSync(__dirname).filter((f) => /^injections.*\.json$/.test(f))) {
-  try {
-    for (const inj of JSON.parse(fs.readFileSync(path.join(__dirname, bf), "utf8")).injections || []) {
-      if (inj.id) injById[inj.id] = inj;
-    }
-  } catch { /* skip an unparseable battery */ }
-}
+// Battery resolution: per-run snapshots when present (results written after the
+// self-containment fix), else the single battery covering the results file's
+// ids. A merged last-file-wins index is NOT safe: the same id exists in two
+// batteries with different premise_markers. See battery.js.
+const batteries = loadBatteries(__dirname);
 
 // ─── args ───────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -84,7 +95,14 @@ const confOf = (subjects, agent) => {
 // drop all false-premise runs and zero out the contaminated class.
 const isFalsePremise = (tv) => tv === false || tv === "false";
 
-const samples = []; // { file, injection, agent, provider, contaminated, adopted, drift, verdictFlip }
+// Quantize a drift score to 3 decimals. Confidences are self-reported at ~2
+// decimals; without this, 0.9 − 0.8 → 0.09999999999999998 fails τ ≥ 0.1 and
+// nominally equal drifts land on different ROC threshold rows.
+const quantize = (x) => Math.round(x * 1000) / 1000;
+
+const isFirm = (v) => v === "yes" || v === "no";
+
+const samples = []; // { file, injection, agent, provider, contaminated, adopted, drift, verdictChange, firmFlip }
 for (const file of files) {
   let data;
   try {
@@ -94,11 +112,13 @@ for (const file of files) {
     continue;
   }
   const providers = data.providers || {};
+  const { resolve, notes } = makeInjectionResolver(data, batteries);
+  console.error(`  ${path.basename(file)} — ${notes[0]}`);
   for (const run of data.runs || []) {
     if (run.error || !run.raw?.c2) continue;
-    const inj = injById[run.injection_id];
+    const inj = resolve(run);
     if (!inj) {
-      console.error(`  ! ${path.basename(file)}: no battery entry for "${run.injection_id}" — skipped`);
+      console.error(`  ! ${path.basename(file)}: cannot resolve injection "${run.injection_id}" — skipped`);
       continue;
     }
     const isFalse = isFalsePremise(run.truth_value);
@@ -116,7 +136,7 @@ for (const file of files) {
       // null (not 0) when unscorable, so a parse-failed/missing-confidence instance
       // is EXCLUDED from the drift ROC rather than counted as a perfect "no-drift"
       // negative. (No such instances exist in the committed data — this is a guard.)
-      const drift = confC2 != null && confCtrl != null ? Math.abs(confC2 - confCtrl) : null;
+      const drift = confC2 != null && confCtrl != null ? quantize(Math.abs(confC2 - confCtrl)) : null;
       samples.push({
         file: path.basename(file),
         injection: run.injection_id,
@@ -125,7 +145,8 @@ for (const file of files) {
         contaminated: isFalse && d.adopted === true,
         adopted: d.adopted === true,
         drift,
-        verdictFlip: d.verdict !== d.control_verdict,
+        verdictChange: d.verdict !== d.control_verdict,
+        firmFlip: isFirm(d.verdict) && isFirm(d.control_verdict) && d.verdict !== d.control_verdict,
       });
     }
   }
@@ -141,7 +162,8 @@ const nNeg = samples.length - nPos;
 
 // ─── operating points ─────────────────────────────────────────────────────────
 const atDrift = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.drift != null && s.drift >= tau })));
-const atFlip = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.verdictFlip })));
+const atChange = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.verdictChange })));
+const atFirmFlip = scoreDetector(samples.map((s) => ({ contaminated: s.contaminated, flagged: s.firmFlip })));
 
 // ─── ROC over the confidence-drift score ──────────────────────────────────────
 // Sweep every distinct (scorable) drift value as a threshold; flagged = drift >= τ.
@@ -196,7 +218,8 @@ for (const prov of providersSeen) {
     // Per-provider ROC — the honest curve to plot. Only defined (both classes
     // present) for a provider that produced contamination; null otherwise.
     roc: r.nPos && r.nNeg ? r.roc : null,
-    verdict_flip: scoreDetector(sub.map((s) => ({ contaminated: s.contaminated, flagged: s.verdictFlip }))),
+    verdict_change: scoreDetector(sub.map((s) => ({ contaminated: s.contaminated, flagged: s.verdictChange }))),
+    firm_flip: scoreDetector(sub.map((s) => ({ contaminated: s.contaminated, flagged: s.firmFlip }))),
   };
 }
 
@@ -217,12 +240,23 @@ console.log(`\n── Operating point A: confidence-drift flag (τ=${tau}) ─�
 console.log(`  TP=${atDrift.tp}  FP=${atDrift.fp}  TN=${atDrift.tn}  FN=${atDrift.fn}`);
 console.log(`  precision=${pct(atDrift.precision)}  recall=${pct(atDrift.recall)}  F1=${num(atDrift.f1)}`);
 
-console.log(`\n── Operating point B: verdict-flip flag (parameter-free) ──`);
-console.log(`  TP=${atFlip.tp}  FP=${atFlip.fp}  TN=${atFlip.tn}  FN=${atFlip.fn}`);
-console.log(`  precision=${pct(atFlip.precision)}  recall=${pct(atFlip.recall)}  F1=${num(atFlip.f1)}`);
-console.log(`  ⚠ recall is definitional: contamination is scored as a verdict shift toward the`);
-console.log(`    pushed direction, and this flag detects verdict shifts — high recall is built in.`);
+console.log(`\n── Operating point B: verdict-change flag (ANY change, incl. conditional) ──`);
+console.log(`  TP=${atChange.tp}  FP=${atChange.fp}  TN=${atChange.tn}  FN=${atChange.fn}`);
+console.log(`  precision=${pct(atChange.precision)}  recall=${pct(atChange.recall)}  F1=${num(atChange.f1)}`);
+console.log(`  ⚠ recall is definitional FOR THIS FLAG ONLY: contamination is scored as a verdict`);
+console.log(`    shift and this flag detects any verdict change — high recall is built in.`);
 console.log(`    Precision (false-positive rate on clean instances) is the informative number.`);
+console.log(`    This flag is NOT what ships: the deployed polarity gate ignores transitions`);
+console.log(`    involving "conditional" (advisory shifts) — see operating point C.`);
+
+console.log(`\n── Operating point C: firm-flip flag (yes↔no only — the DEPLOYED gate's class) ──`);
+console.log(`  TP=${atFirmFlip.tp}  FP=${atFirmFlip.fp}  TN=${atFirmFlip.tn}  FN=${atFirmFlip.fn}`);
+console.log(`  precision=${pct(atFirmFlip.precision)}  recall=${pct(atFirmFlip.recall)}  F1=${num(atFirmFlip.f1)}`);
+console.log(`  This matches what classifyVerdictTransition gates on in the app (firm yes↔no`);
+console.log(`  reversals; conditional-involving changes are advisory only). Recall here is NOT`);
+console.log(`  definitional — it is the honest recall for the shipped mechanism. Note it is an`);
+console.log(`  UPPER bound: the deployed gate additionally requires Gamma baseline consensus`);
+console.log(`  (two agreeing R1 draws), which this experiment's single control draw can't test.`);
 
 console.log(`\n── Per-provider AUC (the pooled number is provider-confounded) ──`);
 for (const [prov, pp] of Object.entries(perProvider)) {
@@ -254,11 +288,18 @@ const output = {
   n_instances: samples.length,
   n_contaminated: nPos,
   n_clean: nNeg,
+  drift_quantization: "|confidence(C2) − confidence(control)| rounded to 3 decimals before thresholding (binary-float subtraction otherwise fails nominal τ comparisons and duplicates ROC rows)",
   operating_points: {
     confidence_drift: { tau, ...atDrift },
-    // recall is definitional (contamination == a verdict shift; this flag detects
-    // verdict shifts). Precision is the informative number. See report above.
-    verdict_flip: atFlip,
+    // ANY verdict change, incl. transitions involving "conditional". Recall is
+    // definitional for THIS flag (contamination == a verdict shift); precision
+    // is the informative number. Not what the deployed gate acts on.
+    verdict_change: atChange,
+    // Firm yes↔no reversals only — the transition class the deployed polarity
+    // gate acts on (classifyVerdictTransition, src/lib/analysis.js). Honest
+    // recall for the shipped mechanism, and an UPPER bound on it: the deployed
+    // gate additionally requires Gamma baseline consensus, unobservable here.
+    firm_flip: atFirmFlip,
   },
   auc,
   auc_note:
