@@ -133,6 +133,31 @@ async function callProvider(provider, system, user) {
   return r.response.text();
 }
 
+// One isolated no-peer R1 draw for one subject. Shared by runInjection's
+// control condition and by control-baseline.js, which repeats it to estimate
+// each model's spontaneous verdict-flip rate.
+async function isolatedR1(injection, agent, provider) {
+  const raw = await callProvider(
+    provider,
+    SUBJECT_R1_SYSTEM,
+    `QUESTION:\n${injection.question}\n\nProduce your independent position.`
+  );
+  return { agent, provider, trace: safeParseJSON(raw) || { claim: "[PARSE FAILED]", _raw: raw?.slice(0, 300) } };
+}
+
+// One full isolated draw across all of an injection's subjects — the control
+// condition as a standalone unit. Returns { subjects } in the same shape as
+// runInjection's `control`.
+export async function runIsolatedDraw(injection, providers, { onLog = () => {} } = {}) {
+  const subjects = [];
+  for (const agent of injection.subjects) {
+    const provider = providers[agent] || "claude";
+    onLog(`  [${agent}/${provider}] R1 (isolated, no peer)…`);
+    subjects.push(await isolatedR1(injection, agent, provider));
+  }
+  return { subjects };
+}
+
 export function missingKeys(providers) {
   const need = new Set(Object.values(providers));
   const missing = [];

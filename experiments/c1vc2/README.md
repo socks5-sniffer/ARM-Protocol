@@ -180,14 +180,54 @@ the continuous drift score carries no usable signal at all.
 node experiments/c1vc2/stats.js experiments/c1vc2/c1vc2-results-allGemini.json
 ```
 
+## Spontaneous-flip baseline (the ground-truth control)
+
+Every contamination positive in the program is an *inferred* verdict movement
+(implicit adoption vs a single control draw); zero explicit marker adoptions
+exist. A model whose verdict is simply unstable on a question produces that
+pattern with no peer influence, so measured IPRs are upper bounds until the
+spontaneous toward-push flip rate is estimated and subtracted. Two scripts
+close the gap:
+
+```bash
+# 1. Collect N independent no-peer draws per (injection, subject).
+#    Default: --draws 15 --panel gemini --battery injections-logical.json
+#    (≈270 gemini-flash calls, 15–25 min; needs GEMINI_API_KEY in .env)
+node experiments/c1vc2/control-baseline.js
+
+# 2. Compare a results file's measured eligible adoption against the
+#    spontaneous-flip null (seeded Monte Carlo; a β-integrated p-value
+#    propagates the uncertainty in p̂ from finite draws).
+node experiments/c1vc2/baseline-analysis.js \
+  experiments/c1vc2/c1vc2-results-allGemini.json \
+  --baseline experiments/c1vc2/control-baseline-gemini-<ts>.json
+```
+
+Run without `--baseline` and the analysis harvests no-peer draws from the
+results file itself — `run.js` draws a fresh isolated R1 every rep, so a
+15-rep file already contains 15 independent control draws per (injection,
+agent), with leave-one-out expectations to avoid conditioning bias. This
+own-file mode shares a session with the measurements (drift isn't controlled),
+so treat it as preliminary and prefer a dedicated `control-baseline.js` sample
+for anything published.
+
+**Preliminary own-file result (2026-07-14, all-Gemini panel):** Gemini's
+no-peer draws disagree with each other ~50% of the time on 5 of 8 fallacy
+questions (flip₂ column) — exactly the regime where single-draw implicit
+adoption is least meaningful. Against that null, **C2 (full-trace) "adoption"
+is fully explained by spontaneous instability** (17 observed vs 16.6 expected,
+p ≈ 0.50), while **C1 (conclusion-only) conformity is real** (34 observed vs
+16.6 expected, p_β ≈ 0.009), as is true-premise updating in both conditions
+(20–23 observed vs 5.7 expected, p ≈ 0.0001). The mixed panel replicates the
+pattern (C1 excess +8.7, p_β ≈ 0.045; C2 excess +1.7, p ≈ 0.31). Reproduce:
+`node experiments/c1vc2/baseline-analysis.js <results.json>`.
+
 ## What's deliberately NOT here yet
 
-- **A repeated no-peer control run:** every current contamination positive is
-  an *inferred* verdict movement (implicit adoption vs a single control draw);
-  zero explicit marker adoptions exist. Without an estimate of each model's
-  spontaneous verdict-flip rate, IPRs are upper bounds that include baseline
-  instability. Needed: same battery, control condition only, ~15 draws per
-  subject.
+- **An independent spontaneous-flip sample:** the baseline analysis above
+  currently runs in own-file mode; a dedicated `control-baseline.js` run
+  (fresh session, ideally more draws) is what turns the preliminary
+  instability correction into a publishable one.
 - **A power-analyzed battery:** k = 8 injections cannot detect small effects
   at the injection level (the blocked test's granularity is 2^−8).
 - **Order counterbalancing:** within a rep, calls always run R1 → C1 → C2;

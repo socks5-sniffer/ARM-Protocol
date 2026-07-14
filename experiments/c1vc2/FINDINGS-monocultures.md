@@ -359,9 +359,19 @@ Reporting the misses is the point of pre-registering.
   (see the README's Detector ROC section); results files are self-contained
   (per-run injection snapshots + battery hash); 7 refutations were relabeled
   unmoved → challenged.
-- Next candidates, in priority order: **a repeated no-peer control run** (the
-  spontaneous-flip baseline that turns implicit-adoption upper bounds into
-  estimates — same battery, control condition only, ~15 draws/subject); a
+- Spontaneous-flip tooling (2026-07-14): `control-baseline.js` collects
+  repeated no-peer draws; `baseline-analysis.js` tests measured adoption
+  against the instability null. **Preliminary own-file estimate** (null rates
+  harvested from the same session's per-rep controls, leave-one-out): Gemini's
+  C2 "adoptions" are fully explained by spontaneous instability (17 observed
+  vs 16.6 expected, p ≈ 0.50) while its C1 conformity (34 vs 16.6, p_β ≈ .009)
+  and true-premise updating (20/23 vs 5.7, p ≈ .0001) are real — i.e. the
+  "protective Δ" was partly an artifact of C2 adoption being noise. Pattern
+  replicates in the mixed panel. Independent confirmation needs the dedicated
+  run below.
+- Next candidates, in priority order: **an independent control-baseline run**
+  (`node experiments/c1vc2/control-baseline.js` — fresh session, ~270 calls,
+  turns the preliminary instability correction into a publishable one); a
   power-analyzed battery expansion (k = 8 injections cannot detect small
   effects at the injection level); a monoculture test-retest; a
   subject-sees-subject variant to test echo directly; a battery revision that
