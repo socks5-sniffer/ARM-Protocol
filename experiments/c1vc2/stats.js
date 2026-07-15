@@ -5,9 +5,21 @@
 //   2. A PAIRED permutation test on Δ. C1 and C2 are the same subjects on the
 //      same injections, so the unit is the subject-instance pair (injection,
 //      rep, agent); the null shuffles the C1/C2 label *within* each pair.
-//   3. The model gap (Gemini adopt-rate − GPT adopt-rate) in the C2 condition,
+//      ⚠ This treats instances as exchangeable and answers the NARROW question
+//      "did condition matter on these specific injections?". It does NOT
+//      license generalizing across injections: instances are nested within a
+//      handful of authored injections (repeated prompts are not independent
+//      evidence), so the instance-level p overstates evidence for any claim
+//      about injections in general.
+//   3. An INJECTION-BLOCKED analysis for the generalization claim: one Δ per
+//      injection (each authored injection contributes a single observation),
+//      tested with an exact sign-flip permutation over blocks. This is the
+//      headline significance test — its n is the number of injections, which
+//      is the true sample size for "does transparency amplify propagation?".
+//   4. The model gap (Gemini adopt-rate − GPT adopt-rate) in the C2 condition,
 //      via an INDEPENDENT two-group permutation test + bootstrap CI. These are
-//      different agents, so the null shuffles the model label across instances.
+//      different agents, so the null shuffles the model label across instances
+//      (the same nesting caveat applies).
 //
 // Seeded RNG → reproducible. By default the adoption labels are RE-SCORED from
 // the raw traces with the current src/lib/score.js (same policy as detector.js):
@@ -25,6 +37,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { computeIPR } from "../../src/lib/score.js";
+import { loadBatteries, makeInjectionResolver } from "./battery.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,8 +48,16 @@ const getFlag = (name, def) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 };
 const file =
-  args.find((a) => !a.startsWith("--") && a !== getFlag("--iters", null) && a !== getFlag("--seed", null)) ||
-  "experiments/c1vc2/c1vc2-results-1782597403181.json";
+  args.find((a) => !a.startsWith("--") && a !== getFlag("--iters", null) && a !== getFlag("--seed", null)) || null;
+if (!file) {
+  const available = fs
+    .readdirSync(__dirname)
+    .filter((f) => /^c1vc2-results.*\.json$/.test(f))
+    .map((f) => `  experiments/c1vc2/${f}`);
+  console.error("Usage: node experiments/c1vc2/stats.js <results.json> [--iters N] [--seed S] [--stored-labels]");
+  console.error(available.length ? `Available results files:\n${available.join("\n")}` : "No results files found — run run.js first.");
+  process.exit(1);
+}
 const ITERS = parseInt(getFlag("--iters", "10000"), 10);
 const SEED = parseInt(getFlag("--seed", "42"), 10);
 const STORED_LABELS = args.includes("--stored-labels");
@@ -80,42 +101,41 @@ function bootstrapCI(items, statFn, iters = ITERS) {
   return [percentile(dist, 0.025), percentile(dist, 0.975)];
 }
 
-// ---- battery index (for re-scoring from raw traces) ----------------------
-// Same construction as detector.js: index every injections*.json in this
-// directory by id, so any results file resolves its injection metadata
-// (premise_markers, pushes_verdict) for the current scorer.
-const injById = {};
-for (const bf of fs.readdirSync(__dirname).filter((f) => /^injections.*\.json$/.test(f))) {
-  try {
-    for (const inj of JSON.parse(fs.readFileSync(path.join(__dirname, bf), "utf8")).injections || []) {
-      if (inj.id) injById[inj.id] = inj;
-    }
-  } catch { /* skip an unparseable battery */ }
-}
+// ---- battery resolution (for re-scoring from raw traces) ------------------
+// Shared with detector.js: per-run snapshots when present, else the unique
+// battery covering this results file's ids. A merged last-file-wins index is
+// NOT safe — the same id exists in two batteries with different
+// premise_markers. See battery.js.
+const batteries = loadBatteries(__dirname);
 
 // ---- load + flatten ------------------------------------------------------
 const data = JSON.parse(fs.readFileSync(file, "utf8"));
+const { resolve: resolveInjection, notes: batteryNotes } = makeInjectionResolver(data, batteries);
 const providers = data.providers || {}; // { beta: "gpt", gamma: "gemini" }
 const agentModel = (agent) => providers[agent] || agent;
 
 // Paired subject instances on FALSE-premise runs.
-//   pair = { c1: 0|1, c2: 0|1, eligible, model, injection }
+//   pair = { c1: 0|1, c2: 0|1, measurable, model, injection }
 //
-// `eligible` marks instances where implicit adoption is MEASURABLE: a subject
-// whose isolated baseline verdict already equals the pushed direction cannot
-// register a verdict-shift adoption, so it deflates IPR without carrying
-// signal. Re-scored details always carry the flag (score.js); on the
+// `measurable` marks instances where adoption is observable: either the
+// baseline verdict differs from the push (`eligible` — implicit adoption is
+// possible), OR the instance registered an explicit adoption (observable on
+// any baseline). A baseline-aligned subject that never explicitly adopts
+// cannot register any adoption, so it deflates IPR without carrying signal.
+// Re-scored details always carry the eligible flag (score.js); on the
 // stored-label path older files derive it from control_verdict + the run's
 // stored push.
 const deriveEligible = (d, push) =>
   push != null && push !== "unknown" && d.control_verdict !== "unknown" && d.control_verdict !== push;
+const isMeasurable = (d, push) =>
+  (d.eligible ?? deriveEligible(d, push)) || d.label === "explicit_adoption";
 
 const pairs = [];
 let rescoredRuns = 0;
 let storedRuns = 0; // runs that used frozen labels (--stored-labels, or missing raw/battery)
 for (const run of data.runs || []) {
   if (!isFalsePremise(run.truth_value)) continue;
-  const inj = injById[run.injection_id];
+  const inj = resolveInjection(run);
   // Push direction for eligibility derivation on the stored-label path. Falls
   // back to the battery entry so a run missing raw.meta (the case that forces
   // stored labels in the first place) doesn't degrade every instance to
@@ -140,16 +160,16 @@ for (const run of data.runs || []) {
   }
 
   const byAgent = {};
-  for (const d of c1d) byAgent[d.agent] = { c1: d.adopted ? 1 : 0, eligible: d.eligible ?? deriveEligible(d, push) };
+  for (const d of c1d) byAgent[d.agent] = { c1: d.adopted ? 1 : 0, measurable: isMeasurable(d, push) };
   for (const d of c2d) {
     byAgent[d.agent] = byAgent[d.agent] || {};
     byAgent[d.agent].c2 = d.adopted ? 1 : 0;
-    if (byAgent[d.agent].eligible == null) byAgent[d.agent].eligible = d.eligible ?? deriveEligible(d, push);
+    byAgent[d.agent].measurable = byAgent[d.agent].measurable || isMeasurable(d, push);
   }
   for (const agent of Object.keys(byAgent)) {
     const p = byAgent[agent];
     if (p.c1 == null || p.c2 == null) continue; // need both conditions to pair
-    pairs.push({ c1: p.c1, c2: p.c2, eligible: !!p.eligible, model: agentModel(agent), injection: run.injection_id });
+    pairs.push({ c1: p.c1, c2: p.c2, measurable: !!p.measurable, model: agentModel(agent), injection: run.injection_id });
   }
 }
 
@@ -185,10 +205,57 @@ function analyzeDelta(ps) {
 }
 
 const all = analyzeDelta(pairs);
-const eligPairs = pairs.filter((p) => p.eligible);
+const eligPairs = pairs.filter((p) => p.measurable);
 const elig = eligPairs.length ? analyzeDelta(eligPairs) : null;
 
-// ---- 3: model gap in C2 (Gemini − GPT adopt rate) ------------------------
+// ---- 3: injection-blocked analysis (the generalization test) --------------
+// Instances are nested within authored injections: 30 repetitions of the same
+// prompt are not 30 independent pieces of evidence about injections in
+// general. For the claim "sharing reasoning amplifies propagation" the unit is
+// the INJECTION, so collapse each injection to one Δ (mean over its paired
+// instances) and run an exact sign-flip permutation over blocks: under the
+// null, each block's Δ is symmetric around 0, so all 2^k signings are equally
+// likely. k ≤ 20 is enumerated exactly; larger k falls back to Monte Carlo.
+function analyzeBlocked(ps) {
+  const byInj = {};
+  for (const p of ps) (byInj[p.injection] ??= []).push(p);
+  const blocks = Object.entries(byInj).map(([injection, bp]) => ({
+    injection,
+    n: bp.length,
+    delta: mean(bp.map((p) => p.c2)) - mean(bp.map((p) => p.c1)),
+  }));
+  const deltas = blocks.map((b) => b.delta);
+  const k = deltas.length;
+  const obs = mean(deltas);
+  let p;
+  let method;
+  if (k <= 20) {
+    let extreme = 0;
+    const total = 1 << k;
+    for (let m = 0; m < total; m++) {
+      let s = 0;
+      for (let i = 0; i < k; i++) s += m & (1 << i) ? -deltas[i] : deltas[i];
+      if (Math.abs(s / k) >= Math.abs(obs) - 1e-12) extreme++;
+    }
+    p = extreme / total; // exact — no add-one correction needed
+    method = `exact sign-flip, 2^${k} signings`;
+  } else {
+    let extreme = 0;
+    for (let it = 0; it < ITERS; it++) {
+      let s = 0;
+      for (const d of deltas) s += rng() < 0.5 ? -d : d;
+      if (Math.abs(s / k) >= Math.abs(obs) - 1e-12) extreme++;
+    }
+    p = (extreme + 1) / (ITERS + 1);
+    method = `Monte Carlo sign-flip, ${ITERS} iters`;
+  }
+  return { blocks, obs, p, method, k };
+}
+
+const blockedAll = analyzeBlocked(pairs);
+const blockedElig = eligPairs.length ? analyzeBlocked(eligPairs) : null;
+
+// ---- 4: model gap in C2 (Gemini − GPT adopt rate) ------------------------
 const models = [...new Set(pairs.map((p) => p.model))];
 let modelBlock = null;
 if (models.length === 2) {
@@ -238,19 +305,33 @@ function printDeltaBlock(r, n) {
   console.log(`IPR(C1) = ${f3(r.iprC1)} (${pct(r.iprC1)})   95% CI ${ci(r.c1CI)}`);
   console.log(`IPR(C2) = ${f3(r.iprC2)} (${pct(r.iprC2)})   95% CI ${ci(r.c2CI)}`);
   console.log("");
-  console.log(`Δ (C2 − C1) = ${f3(r.obsDelta)}   (n=${n})`);
+  console.log(`Δ (C2 − C1) = ${f3(r.obsDelta)}   (n=${n} instances)`);
   console.log(`   95% CI (bootstrap)        ${ci(r.deltaCI)}`);
-  console.log(`   permutation p (two-sided) ${r.deltaP.toFixed(4)}`);
+  console.log(`   permutation p (two-sided) ${r.deltaP.toFixed(4)}   ⚠ instance-level: conditional on THESE injections`);
   const crosses = r.deltaCI[0] <= 0 && r.deltaCI[1] >= 0;
   console.log(
     `   → ${crosses ? "CI includes 0" : "CI excludes 0"}; ` +
       `${r.deltaP < 0.05 ? "significant at .05" : "NOT significant at .05"} ` +
-      `⇒ ${r.deltaP < 0.05 ? "transparency changed propagation" : "no detectable amplification from transparency"}`
+      `(narrow claim — see the injection-blocked test for the generalization claim)`
+  );
+}
+
+function printBlockedBlock(b) {
+  console.log(`per-injection Δ (each authored injection = ONE observation):`);
+  for (const blk of b.blocks) {
+    console.log(`   ${blk.injection.padEnd(46)} Δ=${blk.delta >= 0 ? "+" : ""}${f3(blk.delta)}  (n=${blk.n})`);
+  }
+  console.log(`Δ̄ over ${b.k} injections = ${f3(b.obs)}`);
+  console.log(`   blocked p (two-sided, ${b.method}) = ${b.p.toFixed(4)}`);
+  console.log(
+    `   → ${b.p < 0.05 ? "significant at .05 ⇒ transparency changed propagation" : "NOT significant at .05 ⇒ no detectable amplification from transparency"}` +
+      ` (unit = injection; this is the headline test — the true sample size for generalizing is k=${b.k}, not the instance count)`
   );
 }
 
 console.log(`\nC1-vs-C2 statistics — ${file.split("/").pop()}`);
 console.log(`panel=${data.panel}  models: beta=${agentModel("beta")} gamma=${agentModel("gamma")}`);
+console.log(`${batteryNotes[0]}`);
 console.log(`paired false-premise subject-instances: n=${pairs.length}  (iters=${ITERS}, seed=${SEED})`);
 if (STORED_LABELS) {
   console.log(`scoring: STORED labels (--stored-labels) — frozen at collection time, may predate the 2026-07 scorer audit.`);
@@ -279,10 +360,18 @@ printDeltaBlock(all, pairs.length);
 if (elig) {
   const blind = pairs.length - eligPairs.length;
   console.log("\n" + "─".repeat(64));
-  console.log(`MEASURABLE-ONLY (eligible: baseline ≠ push; blind instances excluded: ${blind})`);
+  console.log(`MEASURABLE-ONLY (baseline ≠ push, or explicit adoption; blind instances excluded: ${blind})`);
   printDeltaBlock(elig, eligPairs.length);
 } else {
-  console.log("\n(no eligible instances — measurable-only block skipped)");
+  console.log("\n(no measurable instances — measurable-only block skipped)");
+}
+
+console.log("\n" + "─".repeat(64));
+console.log(`INJECTION-BLOCKED (headline significance — unit = authored injection)`);
+printBlockedBlock(blockedAll);
+if (blockedElig) {
+  console.log(`\nblocked, measurable-only:`);
+  printBlockedBlock(blockedElig);
 }
 
 if (modelBlock) {

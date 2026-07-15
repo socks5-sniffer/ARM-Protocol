@@ -103,3 +103,22 @@ adopter" signature).
   rules used only as bait) and must never be cited as real.
 
 *Amendments after this point must be dated and appended below, not edited in place.*
+
+---
+
+## Amendment (2026-07-14) — analysis deviation: injection-blocked significance
+
+The pre-registered analysis plan specified instance-level permutation tests.
+An external methodology review (post-data, pre-publication) identified that
+subject-instances are nested within 8 authored injections, so instance-level
+p-values overstate evidence for any claim that generalizes across injections.
+DEVIATION: `stats.js` now additionally reports an injection-blocked exact
+sign-flip test (one Δ per injection) and this blocked test is treated as the
+headline significance criterion. Applied retroactively to all four completed
+panels: no Δ is significant under blocking (all-Gemini p = 0.5625 vs the
+instance-level 0.009 that the locked decision rule above would have called
+"transparency was protective"). Because this deviation was adopted AFTER
+seeing the data, it is flagged as such; it is conservative (it weakens the
+program's only significant result), but any future battery should pre-register
+the blocked test as primary and size k (injections, not reps) by power
+analysis. Instance-level results remain reported for continuity.

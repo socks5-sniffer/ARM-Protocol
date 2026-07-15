@@ -386,7 +386,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
     // so instead of firing a false MANUAL REVIEW the harness raises a
     // baseline-instability advisory and skips the gate. With a rotated silent
     // baseline (legacy rotated-baseline traces) or an unparseable verdict, it falls
-    // the legacy visible-R1-only comparison and records that mode in the audit.
+    // back to the legacy visible-R1-only comparison and records that mode in the audit.
     if (pG2.ok) {
       const r1Dir = extractVerdict(pG1.trace);
       const silentDir = extractVerdict(pSilent.trace);
@@ -566,7 +566,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
           ARM · Agent Reasoning Markup
         </div>
         <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v{ARM_VERSION} · polarity gate (primary) · confidence Δ (unvalidated) · rotating silent baseline · RLHF audit
+          v{ARM_VERSION} · polarity gate (primary) · confidence Δ (unvalidated) · Gamma consensus baseline · RLHF audit
         </div>
         <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
           Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}

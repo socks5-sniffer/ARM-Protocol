@@ -18,6 +18,7 @@
 // tables. See FINDINGS-audit.md and the `eligible` flag in src/lib/score.js.
 
 import "dotenv/config";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -58,7 +59,14 @@ if (!providers) {
 
 // ─── load battery ─────────────────────────────────────────────────────────────
 const batteryPath = path.isAbsolute(batteryFile) ? batteryFile : path.join(__dirname, batteryFile);
-const battery = JSON.parse(fs.readFileSync(batteryPath, "utf8"));
+const batteryRaw = fs.readFileSync(batteryPath, "utf8");
+// Snapshot provenance into the results file so re-scoring never depends on the
+// CURRENT state of a battery file: batteries are mutable, ids are duplicated
+// across batteries with differing content, and detector.js/stats.js re-score
+// from raw traces — resolving against the wrong (or edited) battery entry
+// silently mis-scores. See experiments/c1vc2/battery.js.
+const batterySha256 = crypto.createHash("sha256").update(batteryRaw).digest("hex");
+const battery = JSON.parse(batteryRaw);
 let injections = battery.injections;
 if (only) injections = injections.filter((i) => i.id === only);
 if (!injections.length) {
@@ -92,7 +100,9 @@ async function main() {
         const c1 = computeIPR(result.c1, result.control, injection);
         const c2 = computeIPR(result.c2, result.control, injection);
         console.log(`   IPR (measurable)  C1=${fmt(c1.ipr_eligible)}  C2=${fmt(c2.ipr_eligible)}  Δ(C2−C1)=${fmt(delta(c2.ipr_eligible, c1.ipr_eligible))}  [eligible ${c1.n_eligible}/${c1.n} · ${c2.n_eligible}/${c2.n}]`);
-        runs.push({ injection_id: injection.id, truth_value: injection.truth_value, rep, c1, c2, raw: result });
+        // `injection` is a full per-run snapshot of the battery entry (markers,
+        // push, truth value) — the authoritative source when re-scoring later.
+        runs.push({ injection_id: injection.id, truth_value: injection.truth_value, rep, injection, c1, c2, raw: result });
       } catch (err) {
         console.error(`   ✗ run failed: ${err.message}`);
         runs.push({ injection_id: injection.id, rep, error: err.message });
@@ -158,6 +168,10 @@ async function main() {
   const output = {
     experiment: "arm-c1-vs-c2-injection",
     timestamp: new Date().toISOString(),
+    // Provenance: which battery produced these runs, pinned by content hash.
+    // Each run additionally embeds its full injection snapshot.
+    battery: path.basename(batteryPath),
+    battery_sha256: batterySha256,
     panel,
     providers,
     models: MODELS,
