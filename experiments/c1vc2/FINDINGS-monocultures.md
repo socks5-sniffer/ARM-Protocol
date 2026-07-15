@@ -324,11 +324,13 @@ Reporting the misses is the point of pre-registering.
 - **All adoption positives are inferred** ⟳ (2026-07-14): every contaminated
   instance in the program is `implicit_adoption` — a verdict movement toward
   the push relative to a *single* control draw. Zero explicit marker adoptions
-  exist under the tightened markers. Without repeated no-peer control draws to
-  estimate each model's spontaneous flip rate, adoption counts are upper
-  bounds that include baseline instability. The needed control run: the same 8
-  questions, no peer context, ~15 repeated draws per subject, then subtract
-  the spontaneous toward-push flip rate from measured IPRs.
+  exist under the tightened markers. **Addressed 2026-07-15** by an independent
+  repeated no-peer control run (`control-baseline.js`, 15 draws/subject) and
+  the spontaneous-flip test in `baseline-analysis.js`: against Gemini's own
+  instability floor, C2 false-premise adoption is *below* baseline (no
+  propagation) and C1 is not significant (p_β = 0.10), while the true-premise
+  positive control is p < 0.001. See the Status block and the c1vc2 README's
+  "Spontaneous-flip baseline" section.
 - **Condition order is fixed** ⟳ (2026-07-14): within each rep, calls run
   R1 → C1 → C2. The calls are stateless and independent, so this can only
   matter through provider-side drift over the minutes within a rep — a small
@@ -344,8 +346,11 @@ Reporting the misses is the point of pre-registering.
   claimed significant protective effect does not survive injection-blocked
   testing (all-Gemini p = 0.5625); the honest summary is a clean negative —
   no detectable effect of transparency in either direction at k = 8
-  injections. The founding hypothesis of the transparency-risk framing should
-  be retired in favor of the model-specificity claim.
+  injections. The 2026-07-15 spontaneous-flip control strengthens this: C2
+  (full-trace) false-premise adoption is *below* Gemini's own no-peer
+  instability floor, so there is no propagation to protect against. The
+  founding hypothesis of the transparency-risk framing should be retired in
+  favor of the model-specificity claim.
 - H4 (monoculture poisonability): **supported compositionally** — no echo
   amplification detected (and none detectable by this design).
 - Audit + scorer patch (2026-07-10): the artifactual all-Claude positive Δ is
@@ -359,19 +364,30 @@ Reporting the misses is the point of pre-registering.
   (see the README's Detector ROC section); results files are self-contained
   (per-run injection snapshots + battery hash); 7 refutations were relabeled
   unmoved → challenged.
-- Spontaneous-flip tooling (2026-07-14): `control-baseline.js` collects
-  repeated no-peer draws; `baseline-analysis.js` tests measured adoption
-  against the instability null. **Preliminary own-file estimate** (null rates
-  harvested from the same session's per-rep controls, leave-one-out): Gemini's
-  C2 "adoptions" are fully explained by spontaneous instability (17 observed
-  vs 16.6 expected, p ≈ 0.50) while its C1 conformity (34 vs 16.6, p_β ≈ .009)
-  and true-premise updating (20/23 vs 5.7, p ≈ .0001) are real — i.e. the
-  "protective Δ" was partly an artifact of C2 adoption being noise. Pattern
-  replicates in the mixed panel. Independent confirmation needs the dedicated
-  run below.
-- Next candidates, in priority order: **an independent control-baseline run**
-  (`node experiments/c1vc2/control-baseline.js` — fresh session, ~270 calls,
-  turns the preliminary instability correction into a publishable one); a
+- Spontaneous-flip control **(2026-07-15, independent sample — confirmed).**
+  `control-baseline.js` collected an independent 15-draw no-peer sample
+  (`control-baseline-gemini-1784079512533.json`, 270 clean draws);
+  `baseline-analysis.js` tests measured adoption against that instability
+  floor (`baseline-analysis-results.json` is this run). Gemini's no-peer draws
+  disagree with each other ~49–66% of the time on the active questions, and
+  against the resulting null (≈21 of 162 eligible cells expected to "adopt"
+  from instability alone):
+    - **C2 (full-trace) false-premise adoption is *below* the floor** — 17
+      observed vs 21.2 expected (excess −4.2, p_β = 0.94). Sharing the
+      reasoning does not propagate the planted premise above what isolation
+      produces. The "protective Δ" was C2 adoption being at-or-below noise.
+    - **C1 (conclusion-only) is not significant** above the floor — 34 vs 21.2
+      (excess +12.8, p_β = 0.10). The preliminary own-file estimate called
+      this significant (p_β ≈ .009) because same-session controls understated
+      the spontaneous push rate; the independent sample corrects it to
+      suggestive-only. This is why the independent run was required before
+      claiming C1 conformity.
+    - **True-premise positive control is unambiguous** — 23/23 (C1) and 20/23
+      (C2) vs 3.6 expected, p < 0.001 both. The instrument detects a real
+      peer-driven verdict change when one exists, so the false-premise nulls
+      are genuine insensitivity to falsehood, not measurement failure. (Rests
+      on one true injection — a clean positive control, not a broad claim.)
+- Next candidates, in priority order: a
   power-analyzed battery expansion (k = 8 injections cannot detect small
   effects at the injection level); a monoculture test-retest; a
   subject-sees-subject variant to test echo directly; a battery revision that
