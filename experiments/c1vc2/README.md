@@ -211,23 +211,47 @@ own-file mode shares a session with the measurements (drift isn't controlled),
 so treat it as preliminary and prefer a dedicated `control-baseline.js` sample
 for anything published.
 
-**Preliminary own-file result (2026-07-14, all-Gemini panel):** Gemini's
-no-peer draws disagree with each other ~50% of the time on 5 of 8 fallacy
-questions (flip₂ column) — exactly the regime where single-draw implicit
-adoption is least meaningful. Against that null, **C2 (full-trace) "adoption"
-is fully explained by spontaneous instability** (17 observed vs 16.6 expected,
-p ≈ 0.50), while **C1 (conclusion-only) conformity is real** (34 observed vs
-16.6 expected, p_β ≈ 0.009), as is true-premise updating in both conditions
-(20–23 observed vs 5.7 expected, p ≈ 0.0001). The mixed panel replicates the
-pattern (C1 excess +8.7, p_β ≈ 0.045; C2 excess +1.7, p ≈ 0.31). Reproduce:
-`node experiments/c1vc2/baseline-analysis.js <results.json>`.
+**Result — independent baseline (2026-07-15, all-Gemini panel).** An
+independent 15-draw no-peer sample (`control-baseline-gemini-1784079512533.json`,
+270 clean draws) confirms and sharpens the picture; the committed
+`baseline-analysis-results.json` is this run. Gemini's no-peer draws disagree
+with each other ~49–66% of the time on the active fallacy questions (flip₂
+column) — the regime where single-draw implicit adoption is least meaningful.
+Against that null (spontaneous P(draw lands on the push) ≈ 16%, so ~21 of the
+162 eligible cells are expected to "adopt" from instability alone):
+
+| Condition | Observed | Expected (spontaneous) | Excess | p (β-integrated) |
+|---|---|---|---|---|
+| **C2 false** (full-trace)      | 17 | 21.2 | **−4.2** | 0.94 |
+| **C1 false** (conclusion-only) | 34 | 21.2 | +12.8 | **0.10** |
+| **C1 true** (positive control) | 23 |  3.6 | +19.4 | **<0.001** |
+| **C2 true** (positive control) | 20 |  3.6 | +16.4 | **<0.001** |
+
+Three conclusions:
+
+1. **Full-trace (C2) false-premise adoption sits *below* the spontaneous-flip
+   floor** (17 < 21.2). Sharing the reasoning propagates the planted premise no
+   more than a subject sitting in isolation — the strongest form of the H1
+   null. Whatever the earlier "protective Δ" measured, it was not a peer effect.
+2. **Conclusion-only (C1) shows more adoption (34, ~21%) but it is *not
+   significant* above the instability baseline** once the uncertainty in a p̂
+   estimated from ~15 draws is propagated (p_β = 0.10). Suggestive conformity,
+   not established. (An own-file baseline harvested from the same session
+   over-stated this as p_β ≈ 0.009 — which is exactly why an independent sample
+   was required before claiming it.)
+3. **The true-premise positive control is unambiguous** (23/23 and 20/23 vs 3.6
+   expected, p < 0.001 both conditions). The instrument detects a real
+   peer-driven verdict change when one exists, so the false-premise nulls are
+   genuine insensitivity to falsehood, not measurement failure. (This rests on
+   one true injection — it is a clean positive control, not a general
+   "truth-gated conformity" claim.)
+
+Reproduce: `node experiments/c1vc2/baseline-analysis.js
+experiments/c1vc2/c1vc2-results-allGemini.json --baseline
+experiments/c1vc2/control-baseline-gemini-1784079512533.json`.
 
 ## What's deliberately NOT here yet
 
-- **An independent spontaneous-flip sample:** the baseline analysis above
-  currently runs in own-file mode; a dedicated `control-baseline.js` run
-  (fresh session, ideally more draws) is what turns the preliminary
-  instability correction into a publishable one.
 - **A power-analyzed battery:** k = 8 injections cannot detect small effects
   at the injection level (the blocked test's granularity is 2^−8).
 - **Order counterbalancing:** within a rep, calls always run R1 → C1 → C2;
