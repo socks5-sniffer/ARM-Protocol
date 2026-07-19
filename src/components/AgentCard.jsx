@@ -8,7 +8,7 @@ import { driftLabel } from "../lib/analysis.js";
 export function AgentCard({ agentId, trace, round, isSilent }) {
   const [expanded, setExpanded] = useState(false);
   if (!trace) return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "1rem" }}>
+    <div className="agent-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "1rem" }}>
       <div style={{ fontSize: "0.6rem", color: C.muted, fontFamily: f.mono, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
         {agentId}{isSilent ? " · silent" : ` · r${round}`}
       </div>

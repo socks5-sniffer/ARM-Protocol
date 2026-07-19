@@ -596,7 +596,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             value={questionId}
             onChange={(e) => setQuestionId(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
             disabled={isRunning}
-            style={{ width: "60px", background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.4rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, textAlign: "center" }}
+            style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.4rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, textAlign: "center" }}
           />
         </div>
       </div>
@@ -673,7 +673,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             disabled={isRunning}
             placeholder="proxy token"
             autoComplete="off"
-            style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem", width: "9rem" }}
+            style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, fontSize: "0.65rem", fontFamily: f.mono }}
           />
         </div>
       </div>
