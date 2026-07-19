@@ -250,6 +250,34 @@ Reproduce: `node experiments/c1vc2/baseline-analysis.js
 experiments/c1vc2/c1vc2-results-allGemini.json --baseline
 experiments/c1vc2/control-baseline-gemini-1784079512533.json`.
 
+**Remaining panels (2026-07-19, own-file mode).** The other three panels were
+run through the same correction so every panel has a spontaneous-flip check.
+These use own-file (leave-one-out) baselines: the independent sample is
+Gemini-only, so the provider guard correctly rejects it for the mixed panel
+(whose beta seat is GPT), and no external sample exists for GPT/Claude.
+Outputs are committed per panel (`baseline-analysis-results-mixed.json`,
+`-allGPT.json`, `-allClaude.json`; seed 42).
+
+- **all-GPT:** clean null. 1 observed false-premise adoption vs 1.0 expected
+  (p_β ≈ 1.0); true-premise control 0 observed, 0 expected (GPT never flips
+  spontaneously and never adopted).
+- **all-Claude:** clean null. 0 observed in both conditions vs 3.1 expected.
+  No eligible true-control cells exist — Claude's baseline verdicts already
+  sit on the correct side, so the positive control is untestable here.
+- **Mixed (GPT beta + Gemini gamma):** GPT seats: 0 adoptions anywhere.
+  Gemini seat: C2 false is null (10 observed vs 8.3 expected, p_β = 0.50);
+  the true-premise control fires in both conditions (C1 12 vs 2.6,
+  p_β = 0.0001; C2 9 vs 2.6, p_β = 0.0028), replicating the all-Gemini
+  positive control in a second panel. C1 false is nominally above the floor
+  (17 vs 8.3, p_β = 0.045) — but own-file baselines understated the floor in
+  the all-Gemini panel (p_β 0.009 → 0.10 under the independent sample), so
+  treat this as **suggestive-only pending an independent mixed-panel
+  baseline**, not an established conformity effect.
+
+The cross-panel picture is unchanged: no panel shows significant false-premise
+propagation under C2 (full-trace sharing), adoption is confined to Gemini
+seats, and the true-premise control fires wherever it is testable.
+
 ## What's deliberately NOT here yet
 
 - **A power-analyzed battery:** k = 8 injections cannot detect small effects
