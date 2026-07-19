@@ -1,0 +1,357 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+:root {
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: #08090d;
+  font-size: 17px;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: #08090d;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+select,
+input[type="checkbox"] {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #69a7ff;
+  outline-offset: 2px;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+::selection {
+  background: #315f9f;
+  color: #f4f8ff;
+}
+
+#root {
+  min-height: 100vh;
+  background: #08090d;
+}
+
+.app-shell {
+  width: min(100%, 1480px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(1.25rem, 2.6vw, 2.5rem);
+}
+
+.app-header {
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid #273044;
+  margin-bottom: 1.5rem;
+}
+
+.app-title {
+  text-wrap: balance;
+}
+
+.app-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1.25rem;
+  margin-top: 0.45rem;
+}
+
+.app-meta > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.question-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.25rem;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.question-grid textarea {
+  width: 100%;
+  min-height: 7rem !important;
+  line-height: 1.55;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.question-grid textarea:hover:not(:disabled),
+.question-id input:hover:not(:disabled),
+.control-field input:hover:not(:disabled),
+.control-field select:hover:not(:disabled) {
+  border-color: #3a4964 !important;
+}
+
+.question-id {
+  min-width: 0;
+}
+
+.question-id input {
+  width: 100% !important;
+  min-height: 2.2rem;
+}
+
+.control-panel {
+  padding: 0.9rem;
+  border: 1px solid #20283a;
+  border-radius: 6px;
+  background: #0c0f15;
+  margin-bottom: 1rem;
+}
+
+.control-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem 1rem !important;
+  align-items: end !important;
+}
+
+.control-field {
+  display: flex !important;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 0.35rem !important;
+  line-height: 1.25;
+}
+
+.control-field select,
+.control-field input[type="password"] {
+  width: 100% !important;
+  min-height: 2.15rem;
+  margin-left: 0 !important;
+  padding: 0.35rem 0.5rem !important;
+  border-radius: 4px;
+}
+
+.control-field--toggle {
+  min-height: 2.15rem;
+  flex-direction: row !important;
+  align-items: center !important;
+  align-self: end;
+  padding: 0.35rem 0;
+}
+
+.control-field--toggle input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: #69a7ff;
+}
+
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+}
+
+.action-button {
+  min-height: 2.55rem;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.action-button:hover:not(:disabled) {
+  border-color: #8dbdff !important;
+  color: #d8e9ff !important;
+}
+
+.run-log {
+  max-height: min(34vh, 22rem);
+  overflow: auto;
+  scrollbar-color: #35425a #0f1117;
+  overflow-wrap: anywhere;
+}
+
+.round-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.round-heading::after {
+  height: 1px;
+  min-width: 2rem;
+  flex: 1;
+  background: #20283a;
+  content: "";
+}
+
+.agent-grid {
+  display: grid !important;
+  gap: 0.9rem !important;
+  align-items: start;
+}
+
+.agent-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.agent-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.agent-card,
+.gamma-card {
+  min-width: 0;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 14%);
+}
+
+.agent-card *,
+.gamma-card * {
+  overflow-wrap: anywhere;
+}
+
+.card-header {
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.gamma-card .card-header {
+  justify-content: flex-start !important;
+}
+
+.gamma-card .card-header > :first-child {
+  margin-right: auto;
+}
+
+.metric-stack {
+  padding: 0.7rem 0.85rem;
+  border-left: 2px solid #273044;
+}
+
+.summary-panel {
+  overflow: hidden;
+}
+
+.summary-row {
+  display: grid !important;
+  grid-template-columns: minmax(7rem, 0.75fr) minmax(5rem, 0.45fr) minmax(9rem, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.summary-row > :nth-child(2) {
+  text-align: center;
+}
+
+.summary-row > :last-child {
+  text-align: right;
+}
+
+@media (max-width: 1050px) {
+  .control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-grid--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .agent-grid--three > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .app-shell {
+    padding: 1rem;
+  }
+
+  .question-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .question-id {
+    display: grid !important;
+    grid-template-columns: 1fr 6rem;
+    align-items: center;
+  }
+
+  .control-panel {
+    padding: 0.75rem;
+  }
+
+  .control-grid,
+  .agent-grid--three,
+  .agent-grid--two {
+    grid-template-columns: 1fr !important;
+  }
+
+  .agent-grid--three > :last-child {
+    grid-column: auto;
+  }
+
+  .summary-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .summary-row > :nth-child(2) {
+    text-align: right;
+  }
+
+  .summary-row > :last-child {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+@media (max-width: 440px) {
+  .app-shell {
+    padding: 0.75rem;
+  }
+
+  .action-bar,
+  .action-button {
+    width: 100%;
+  }
+
+  .action-button {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

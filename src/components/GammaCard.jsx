@@ -14,8 +14,8 @@ export function GammaCard({ trace }) {
   const modelTag = trace._meta?.model;
 
   return (
-    <div style={{ background: C.surface2, border: `2px solid ${C.gamma}30`, borderRadius: "6px", padding: "1.25rem", marginTop: "1rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+    <div className="gamma-card" style={{ background: C.surface2, border: `2px solid ${C.gamma}30`, borderRadius: "6px", padding: "1.25rem", marginTop: "1rem" }}>
+      <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
         <div style={{ fontSize: "0.6rem", color: C.gamma, fontFamily: f.mono, letterSpacing: "0.15em", textTransform: "uppercase" }}>
           gamma · reconciler · r2
         </div>
