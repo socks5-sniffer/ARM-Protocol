@@ -558,36 +558,38 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
   });
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", fontFamily: f.mono, color: C.text, padding: "1.5rem", maxWidth: "960px", margin: "0 auto" }}>
+    <div className="app-shell" style={{ fontFamily: f.mono, color: C.text }}>
 
       {/* Header */}
-      <div style={{ borderBottom: `1px solid ${C.border}`, paddingBottom: "1rem", marginBottom: "1.5rem" }}>
-        <div style={{ fontSize: "1rem", color: C.accent, letterSpacing: "0.2em", textTransform: "uppercase", margin: 0 }}>
+      <div className="app-header">
+        <div className="app-title" style={{ fontSize: "1rem", color: C.accent, letterSpacing: "0.2em", textTransform: "uppercase", margin: 0 }}>
           ARM · Agent Reasoning Markup
         </div>
-        <div style={{ fontSize: "0.66rem", color: C.text, marginTop: "0.25rem" }}>
-          v{ARM_VERSION} · polarity gate (primary) · confidence Δ (unvalidated) · Gamma consensus baseline · RLHF audit
-        </div>
-        <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.2rem" }}>
-          Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
-        </div>
-        <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.1rem" }}>
-          Tokens: R1 {TOKENS_R1} · R2 {TOKENS_R2} · γR2 {TOKENS_GAMMA}
-        </div>
-        <div style={{ fontSize: "0.62rem", color: C.text, marginTop: "0.1rem" }}>
-          Drift flags: up &gt; {DRIFT_UP_THRESHOLD} · down &lt; {DRIFT_DOWN_THRESHOLD}
+        <div className="app-meta">
+          <div style={{ fontSize: "0.66rem", color: C.text }}>
+            v{ARM_VERSION} · polarity gate (primary) · confidence Δ (unvalidated) · Gamma consensus baseline · RLHF audit
+          </div>
+          <div style={{ fontSize: "0.62rem", color: C.text }}>
+            Models: α {PROVIDER_MODEL[alphaProvider]} · β {PROVIDER_MODEL[betaProvider]} · γ {PROVIDER_MODEL[gammaProvider]}
+          </div>
+          <div style={{ fontSize: "0.62rem", color: C.text }}>
+            Tokens: R1 {TOKENS_R1} · R2 {TOKENS_R2} · γR2 {TOKENS_GAMMA}
+          </div>
+          <div style={{ fontSize: "0.62rem", color: C.text }}>
+            Drift flags: up &gt; {DRIFT_UP_THRESHOLD} · down &lt; {DRIFT_DOWN_THRESHOLD}
+          </div>
         </div>
       </div>
 
       {/* Question */}
-      <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", marginBottom: "1rem" }}>
+      <div className="question-grid">
         <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={isRunning}
           style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, color: C.text, padding: "0.75rem", borderRadius: "4px", fontSize: "0.78rem", fontFamily: f.mono, resize: "vertical", minHeight: "90px", boxSizing: "border-box" }}
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+        <div className="question-id" style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
           <label style={{ fontSize: "0.6rem", color: C.muted, whiteSpace: "nowrap" }}>question id</label>
           <input
             type="text"
@@ -600,9 +602,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       </div>
 
       {/* Controls */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
+      <div className="control-panel control-grid">
         {/* Role injection toggle */}
-        <label style={{ fontSize: "0.68rem", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+        <label className="control-field control-field--toggle" style={{ fontSize: "0.68rem", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <input type="checkbox" checked={roleInjection} onChange={(e) => setRoleInjection(e.target.checked)} disabled={isRunning} />
           role injection
         </label>
@@ -610,7 +612,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         {/* Frame selectors */}
         {roleInjection && (
           <>
-            <div style={{ fontSize: "0.65rem", color: C.muted }}>
+            <div className="control-field" style={{ fontSize: "0.65rem", color: C.muted }}>
               Alpha:
               <select value={alphaFrame} onChange={(e) => setAlphaFrame(e.target.value)} disabled={isRunning}
                 style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
@@ -619,7 +621,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
                 <option value="independent">independent</option>
               </select>
             </div>
-            <div style={{ fontSize: "0.65rem", color: C.muted }}>
+            <div className="control-field" style={{ fontSize: "0.65rem", color: C.muted }}>
               Beta:
               <select value={betaFrame} onChange={(e) => setBetaFrame(e.target.value)} disabled={isRunning}
                 style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
@@ -632,7 +634,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         )}
 
         {/* Provider selectors */}
-        <div style={{ fontSize: "0.65rem", color: C.alpha }}>
+        <div className="control-field" style={{ fontSize: "0.65rem", color: C.alpha }}>
           Alpha provider:
           <select value={alphaProvider} onChange={(e) => setAlphaProvider(e.target.value)} disabled={isRunning}
             style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
@@ -641,7 +643,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             <option value="gemini">Gemini</option>
           </select>
         </div>
-        <div style={{ fontSize: "0.65rem", color: C.beta }}>
+        <div className="control-field" style={{ fontSize: "0.65rem", color: C.beta }}>
           Beta provider:
           <select value={betaProvider} onChange={(e) => setBetaProvider(e.target.value)} disabled={isRunning}
             style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
@@ -650,7 +652,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             <option value="gemini">Gemini</option>
           </select>
         </div>
-        <div style={{ fontSize: "0.65rem", color: C.gamma }}>
+        <div className="control-field" style={{ fontSize: "0.65rem", color: C.gamma }}>
           Gamma provider:
           <select value={gammaProvider} onChange={(e) => setGammaProvider(e.target.value)} disabled={isRunning}
             style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, marginLeft: "0.35rem", fontSize: "0.65rem", fontFamily: f.mono, padding: "0.1rem 0.3rem" }}>
@@ -662,7 +664,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
 
         {/* Proxy access token — gates the production /api proxy (server.js).
             Stored in localStorage, sent as x-arm-token; never baked into the bundle. */}
-        <div style={{ fontSize: "0.65rem", color: C.muted }}>
+        <div className="control-field" style={{ fontSize: "0.65rem", color: C.muted }}>
           access token:
           <input
             type="password"
@@ -676,8 +678,9 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
+      <div className="action-bar">
         <button
+          className="action-button"
           onClick={run} disabled={isRunning}
           style={{ background: C.accentDim, color: C.accent, border: `1px solid ${C.accent}`, padding: "0.55rem 1.4rem", borderRadius: "3px", cursor: isRunning ? "not-allowed" : "pointer", fontSize: "0.75rem", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: f.mono }}
         >
@@ -685,6 +688,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
         </button>
         {status === "done" && (
           <button
+            className="action-button"
             onClick={() => exportJSON({ arm_version: ARM_VERSION, schema_version: EXPORT_SCHEMA_VERSION, r1, r2, convergence, tfidf_convergence: tfidfConvergence, embedding_convergence: embedConvergence, runMeta, question, providers: runMeta?.providers }).catch(err => alert(err.message))}
             style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, padding: "0.55rem 1rem", borderRadius: "3px", cursor: "pointer", fontSize: "0.72rem", fontFamily: f.mono }}
           >
@@ -695,7 +699,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
 
       {/* Log */}
       {log.length > 0 && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "0.6rem 0.75rem", fontSize: "0.65rem", color: C.muted, marginBottom: "1.5rem", lineHeight: 1.7 }}>
+        <div className="run-log" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "0.6rem 0.75rem", fontSize: "0.65rem", color: C.muted, marginBottom: "1.5rem", lineHeight: 1.7 }}>
           {log.map((l, i) => <div key={i}>{l}</div>)}
         </div>
       )}
@@ -703,10 +707,10 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {/* R1 */}
       {(r1.alpha || r1.beta || r1.gamma) && (
         <>
-          <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.5rem" }}>
+          <div className="round-heading" style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.5rem" }}>
             Round 1 — Isolation · Zero Cross-Visibility · Sequential Dispatch
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem", marginBottom: "0.75rem" }}>
+          <div className="agent-grid agent-grid--three" style={{ marginBottom: "0.75rem" }}>
             <AgentCard agentId="alpha" trace={r1.alpha} round={1} />
             <AgentCard agentId="beta"  trace={r1.beta}  round={1} />
             <AgentCard agentId="gamma" trace={r1.gamma} round={1} />
@@ -720,7 +724,7 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           {convergence !== null && (
-            <div style={{ fontSize: "0.65rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <div className="metric-stack" style={{ fontSize: "0.65rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
               <span style={{ color: convergence > 0.4 ? C.warn : C.success }}>
                 R1 jaccard: {convergence.toFixed(3)} — {convergence > 0.4 ? "⚠ shared priors" : "healthy independence"}
               </span>
@@ -742,10 +746,10 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
       {/* R2 */}
       {(r2.alpha || r2.beta) && (
         <>
-          <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.5rem", marginTop: "1rem" }}>
+          <div className="round-heading" style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.5rem", marginTop: "1rem" }}>
             Round 2 — Deliberation · Adversarial Pressure Active
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+          <div className="agent-grid agent-grid--two" style={{ marginBottom: "0.75rem" }}>
             <AgentCard agentId="alpha" trace={r2.alpha} round={2} />
             <AgentCard agentId="beta"  trace={r2.beta}  round={2} />
           </div>
@@ -755,19 +759,19 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
 
       {/* Drift Summary */}
       {status === "done" && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
+        <div className="summary-panel" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1rem", marginTop: "1.5rem" }}>
           <div style={{ fontSize: "0.58rem", letterSpacing: "0.2em", color: C.muted, textTransform: "uppercase", marginBottom: "0.6rem" }}>
             Confidence Δ · descriptive only (unvalidated — not a detector)
           </div>
           {driftSummary.map(({ id, delta, label, color, mismatch }) => (
-            <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+            <div className="summary-row" key={id} style={{ padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
               <span style={{ color: id === "alpha" ? C.alpha : C.beta, textTransform: "uppercase", fontSize: "0.68rem" }}>{id}</span>
               <span style={{ color: C.muted, fontFamily: f.mono, fontSize: "0.68rem" }}>{delta !== null && delta !== undefined ? (delta > 0 ? "+" : "") + delta.toFixed(3) : "—"}</span>
               <span style={{ color, fontSize: "0.68rem" }}>{label}{mismatch ? " · ⚠ self-report Δ mismatch" : ""}</span>
             </div>
           ))}
           {r2.gamma && (
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+            <div className="summary-row" style={{ padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
               <span style={{ color: C.gamma, textTransform: "uppercase", fontSize: "0.68rem" }}>gamma self-Δ</span>
               <span style={{ color: C.muted, fontFamily: f.mono, fontSize: "0.68rem" }}>
                 {Number.isFinite(r2.gamma.harness_self_delta_vs_baseline) ? (r2.gamma.harness_self_delta_vs_baseline > 0 ? "+" : "") + Number(r2.gamma.harness_self_delta_vs_baseline).toFixed(3) : "—"}
@@ -776,28 +780,28 @@ IMPORTANT: Complete the RLHF bias audit in rlhf_audit_notes.`;
             </div>
           )}
           {convergence !== null && (
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+            <div className="summary-row" style={{ padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
               <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 jaccard</span>
               <span style={{ color: convergence > 0.4 ? C.warn : C.success, fontFamily: f.mono, fontSize: "0.68rem" }}>{convergence.toFixed(3)}</span>
               <span style={{ color: convergence > 0.4 ? C.warn : C.muted, fontSize: "0.68rem" }}>{convergence > 0.4 ? "⚠ shared priors" : "healthy"}</span>
             </div>
           )}
           {tfidfConvergence !== null && (
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+            <div className="summary-row" style={{ padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
               <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 tfidf-cos</span>
               <span style={{ color: tfidfConvergence > 0.4 ? C.warn : C.success, fontFamily: f.mono, fontSize: "0.68rem" }}>{tfidfConvergence.toFixed(3)}</span>
               <span style={{ color: tfidfConvergence > 0.4 ? C.warn : C.muted, fontSize: "0.68rem" }}>{tfidfConvergence > 0.4 ? "⚠ weighted lexical overlap" : "healthy"}</span>
             </div>
           )}
           {embedConvergence !== null && (
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
+            <div className="summary-row" style={{ padding: "0.35rem 0", borderBottom: `1px solid ${C.border}` }}>
               <span style={{ color: C.text, fontSize: "0.68rem" }}>R1 embed-cos</span>
               <span style={{ color: embedConvergence > 0.85 ? C.warn : C.success, fontFamily: f.mono, fontSize: "0.68rem" }}>{embedConvergence.toFixed(3)}</span>
               <span style={{ color: embedConvergence > 0.85 ? C.warn : C.muted, fontSize: "0.68rem" }}>{embedConvergence > 0.85 ? "⚠ semantic convergence" : "semantic ok"}</span>
             </div>
           )}
           {runMeta && (
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "0.35rem 0" }}>
+            <div className="summary-row" style={{ padding: "0.35rem 0" }}>
               <span style={{ color: C.muted, fontSize: "0.65rem" }}>silent_baseline_role</span>
               <span style={{ color: C.silent, fontSize: "0.65rem" }}>{runMeta.silentAgent}</span>
               <span style={{ color: C.muted, fontSize: "0.65rem" }}>duration: {runMeta.duration}s</span>

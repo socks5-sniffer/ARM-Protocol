@@ -26,8 +26,8 @@ export function AgentCard({ agentId, trace, round, isSilent }) {
   const modelTag = trace._meta?.model;
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${failed ? C.error : C.border}`, borderRadius: "6px", padding: "1rem", position: "relative" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+    <div className="agent-card" style={{ background: C.surface, border: `1px solid ${failed ? C.error : C.border}`, borderRadius: "6px", padding: "1rem", position: "relative" }}>
+      <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
         <div style={{ fontSize: "0.6rem", color: accentColor, fontFamily: f.mono, letterSpacing: "0.15em", textTransform: "uppercase" }}>
           {agentId}{isSilent ? " · silent baseline" : ` · r${round}`}
         </div>
