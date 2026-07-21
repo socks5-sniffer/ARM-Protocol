@@ -387,6 +387,17 @@ Reporting the misses is the point of pre-registering.
       peer-driven verdict change when one exists, so the false-premise nulls
       are genuine insensitivity to falsehood, not measurement failure. (Rests
       on one true injection — a clean positive control, not a broad claim.)
+- Spontaneous-flip check extended to all four panels **(2026-07-19, own-file
+  mode)**: all-GPT and all-Claude are clean nulls (GPT: 1 observed vs 1.0
+  expected; Claude: 0 observed vs 3.1 expected; Claude has no eligible
+  true-control cells since its baselines already sit on the correct verdict).
+  Mixed panel: GPT seat fully clean; Gemini seat replicates the pattern —
+  C2 false null (p_β = 0.50), true-premise control fires both conditions
+  (p_β ≤ 0.003), C1 false nominally above the floor (p_β = 0.045) but
+  suggestive-only, since own-file baselines understated the floor in the
+  all-Gemini panel (0.009 → 0.10 under the independent sample) and the
+  Gemini-only independent baseline cannot be applied to a mixed panel.
+  Per-panel outputs: `baseline-analysis-results-{mixed,allGPT,allClaude}.json`.
 - Next candidates, in priority order: a
   power-analyzed battery expansion (k = 8 injections cannot detect small
   effects at the injection level); a monoculture test-retest; a

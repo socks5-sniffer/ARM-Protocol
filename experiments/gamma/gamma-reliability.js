@@ -26,7 +26,7 @@
  * .env file — supports both plain and VITE_ prefix (matches your
  * existing xCGG setup):
  *   ANTHROPIC_API_KEY=sk-ant-...
- *   GEMINI_API_KEY=AI...
+ *   GOOGLE_API_KEY=AI...   (or GEMINI_API_KEY — same fallback order as server.js)
  *   OPENAI_API_KEY=sk-...
  *   (or VITE_ANTHROPIC_API_KEY etc. — both work)
  */
@@ -45,7 +45,7 @@ const __dirname  = path.dirname(__filename);
 
 // ─── API keys — support both VITE_ prefix and plain ──────────────────────────
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY  || process.env.VITE_ANTHROPIC_API_KEY;
-const GEMINI_KEY    = process.env.GEMINI_API_KEY     || process.env.VITE_GEMINI_API_KEY;
+const GEMINI_KEY    = process.env.GOOGLE_API_KEY     || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 const OPENAI_KEY    = process.env.OPENAI_API_KEY     || process.env.VITE_OPENAI_API_KEY;
 
 // Model strings — match your ARM v7.1 exactly
@@ -203,7 +203,7 @@ async function main() {
   // Validate API keys before spending time on calls
   const missing = [];
   if (!ANTHROPIC_KEY) missing.push('ANTHROPIC_API_KEY');
-  if (!GEMINI_KEY)    missing.push('GEMINI_API_KEY');
+  if (!GEMINI_KEY)    missing.push('GOOGLE_API_KEY (or GEMINI_API_KEY)');
   if (!OPENAI_KEY)    missing.push('OPENAI_API_KEY');
   if (missing.length) {
     console.error(`ERROR: Missing API keys: ${missing.join(', ')}`);

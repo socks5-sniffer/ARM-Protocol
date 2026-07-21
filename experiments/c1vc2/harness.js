@@ -19,7 +19,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
-const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+const GEMINI_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
 
 export const MODELS = {
@@ -163,7 +163,7 @@ export function missingKeys(providers) {
   const missing = [];
   if (need.has("claude") && !ANTHROPIC_KEY) missing.push("ANTHROPIC_API_KEY");
   if (need.has("gpt") && !OPENAI_KEY) missing.push("OPENAI_API_KEY");
-  if (need.has("gemini") && !GEMINI_KEY) missing.push("GEMINI_API_KEY");
+  if (need.has("gemini") && !GEMINI_KEY) missing.push("GOOGLE_API_KEY (or GEMINI_API_KEY)");
   return missing;
 }
 
