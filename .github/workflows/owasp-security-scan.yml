@@ -94,11 +94,13 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # eslint, eslint-plugin-security, eslint-plugin-no-unsanitized and
+      # @typescript-eslint/parser are devDependencies, so `npm ci` installs the
+      # lockfile-pinned versions. Do not `npm install` them here: an unpinned
+      # install pulls whatever is `latest` on the registry and broke this job
+      # when a half-published @typescript-eslint release was picked up.
       - name: Install dependencies
         run: npm ci
-
-      - name: Install ESLint security plugins
-        run: npm install --save-dev eslint eslint-plugin-security eslint-plugin-no-unsanitized @typescript-eslint/parser
 
       - name: Create ESLint security config
         run: |
