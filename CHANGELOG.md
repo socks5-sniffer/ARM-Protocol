@@ -9,6 +9,14 @@ trace-schema changes.
 
 ## [Unreleased]
 
+### Changed
+- **Default model panel moved to the current mid tier:** `claude-sonnet-5-5`,
+  `gpt-6-sol`, `gemini-3.8-flash` (was `claude-sonnet-4-6`,
+  `gpt-5.5-2026-04-23`, `gemini-3.5-flash`). API call shapes are unchanged.
+  The previous ids stay in the `server.js` allowlists, so published v0.9 results
+  can be reproduced via the `VITE_*_MODEL` overrides. Runs on the new panel are
+  new data, not directly comparable to the published v0.9 findings.
+
 ### Security
 - **Untrusted-input envelope markers can no longer be forged.** `sanitizeText`
   now strips any literal `[BEGIN/END UNTRUSTED INPUT …]` marker from untrusted

@@ -6,7 +6,7 @@ Current multi-agent AI systems operate on a "black-box" communication model: the
 
 **ARM (Agent Reasoning Markup)** is a multi-agent reasoning transparency protocol designed to solve this. Instead of merely passing conclusions, agents share compressed internal chain of thought — their assumptions, critical paths, discarded alternatives, confidence levels, and decision basis. This allows downstream agents to explicitly audit, challenge, and reconcile underlying logic, replacing unearned consensus with explicit, auditable reconciliation.
 
-> **Current version:** `v0.9` · `src/App.jsx` · Models: `claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash` (any agent slot can be assigned to any provider)
+> **Current version:** `v0.9` · `src/App.jsx` · Default models: `claude-sonnet-5-5` · `gpt-6-sol` · `gemini-3.8-flash` (any agent slot can be assigned to any provider). Published v0.9 findings below were run on the previous panel (`claude-sonnet-4-6` · `gpt-5.5-2026-04-23` · `gemini-3.5-flash`); set `VITE_ANTHROPIC_MODEL` / `VITE_GPT_MODEL` / `VITE_GEMINI_MODEL` to reproduce them.
 
 -----
 
@@ -63,8 +63,8 @@ Gamma R2 produces the master output:
 ### Prerequisites
 - Node.js
 - An Anthropic API key (Claude) — required
-- An OpenAI API key (`gpt-5.5-2026-04-23`) — optional, for cross-model runs
-- A Google Gemini API key (Gemini 3.5 Flash) — optional, for cross-model runs
+- An OpenAI API key (`gpt-6-sol`) — optional, for cross-model runs
+- A Google Gemini API key (Gemini 3.8 Flash) — optional, for cross-model runs
 
 ### Installation
 

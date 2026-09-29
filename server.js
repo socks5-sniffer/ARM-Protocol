@@ -87,8 +87,16 @@ function modelAllowlist(envName, defaults) {
   if (!raw) return new Set(defaults);
   return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
 }
-const ALLOWED_ANTHROPIC_MODELS = modelAllowlist("ARM_ALLOWED_ANTHROPIC_MODELS", ["claude-sonnet-4-6"]);
-const ALLOWED_OPENAI_MODELS = modelAllowlist("ARM_ALLOWED_OPENAI_MODELS", ["gpt-5.5-2026-04-23"]);
+// The first id in each list is the current default; the rest are the previous
+// panel, kept so published v0.9 runs can be reproduced.
+const ALLOWED_ANTHROPIC_MODELS = modelAllowlist("ARM_ALLOWED_ANTHROPIC_MODELS", [
+  "claude-sonnet-5-5",
+  "claude-sonnet-4-6",
+]);
+const ALLOWED_OPENAI_MODELS = modelAllowlist("ARM_ALLOWED_OPENAI_MODELS", [
+  "gpt-6-sol",
+  "gpt-5.5-2026-04-23",
+]);
 const ALLOWED_OPENAI_EMBEDDING_MODELS = modelAllowlist("ARM_ALLOWED_OPENAI_EMBEDDING_MODELS", [
   "text-embedding-3-small",
 ]);
@@ -351,7 +359,8 @@ app.use("/api/openai", async (req, res) => {
 // VALIDATED model id — never forwarded raw — preserving the broken-access-control
 // protection (no arbitrary path/model can be proxied on the operator key).
 const ALLOWED_GEMINI_MODELS = new Set([
-  "gemini-3.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3.5-flash", // previous panel — reproduces published v0.9 runs
   "gemini-2.5-pro", // retained for back-compat with older trace reruns
 ]);
 
@@ -373,7 +382,7 @@ app.use("/api/gemini", async (req, res) => {
   }
 
   // req.path is relative to the /api/gemini mount, e.g.
-  //   /v1beta/models/gemini-3.5-flash:generateContent
+  //   /v1beta/models/gemini-3.8-flash:generateContent
   const match = req.path.match(/^\/v1beta\/models\/([A-Za-z0-9.\-]+):generateContent$/);
   if (!match || !ALLOWED_GEMINI_MODELS.has(match[1])) {
     res.status(400).json({ error: "Unsupported or invalid Gemini model path." });
